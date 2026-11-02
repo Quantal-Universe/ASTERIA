@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SPHEREx Sky Survey Research Tool - NASA Time-Domain Explorer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    
+    <!-- Tailwind CSS (retained for layout compatibility) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            /* Layout variables from layout.html */
+            --bg: #0d1120;
+            --card: #161c30;
+            --ink: #e8ecf8;
+            --mute: #98a2bf;
+            --line: #263050;
+            --acc: #8b87ff;
+            --accs: #26264d;
+            --sh: 0 1px 3px rgba(0,0,0,.4);
+            --sky: #0b1020;
+        }
+        body { background: var(--bg); color: var(--ink); font-family: Inter, sans-serif; font-size: 15px; height: 100vh; margin: 0; }
+        #app { display: grid; grid-template-columns: 35% minmax(0,1fr) 64px; height: 100%; gap: 16px; padding: 16px; }
+        .panel { background: var(--card); border-radius: 20px; box-shadow: var(--sh); border: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Integration styles */
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--sky); }
+        ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="loginOverlay" class="fixed inset-0 bg-slate-950/90 z-[10000] flex items-center justify-center">
+        <div class="bg-slate-900 p-8 rounded-xl border border-slate-700 text-center space-y-4">
+            <h2 class="text-2xl font-bold text-white">Unlock AI Discovery</h2>
+            <p class="text-slate-400">Login with OpenRouter to enable AI-powered analysis.</p>
+            <button id="loginBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg">Login with OpenRouter</button>
+        </div>
+    </div>
+    
+    <div id="app">
+        <!-- LEFT PANEL: Search results (Fixed top) -->
+        <aside class="panel" id="left">
+            <div class="p-4 border-b border-slate-700 bg-slate-900">
+                <h1 class="text-lg font-bold mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-cyan-400"></i> Research Dashboard
+                </h1>
+                <div class="flex items-center gap-2 border border-slate-700 rounded-lg px-3 py-2 bg-slate-950">
+                    <i class="fa-solid fa-search text-slate-500"></i>
+                    <input type="text" id="searchInput" placeholder="Search targets..." onkeyup="if(event.key === 'Enter') handleSearch()" class="bg-transparent border-none outline-none w-full text-sm">
+                </div>
+            </div>
+            <div id="resultsList" class="flex-1 overflow-y-auto p-4 space-y-2">
+                <!-- Search results injected here -->
+            </div>
+            <!-- RESTORED DETAILS AREA IN LEFT PANEL -->
+            <div id="detailsArea" class="p-4 border-t border-slate-700 bg-slate-900/80">
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Object Info</h3>
+                <div id="panelContent" class="text-xs space-y-1">Select an object to see details.</div>
+            </div>
+        </aside>
+
+        <!-- CENTRAL VIEW: Canvas & Visuals -->
+        <main class="panel" id="main">
+            <!-- Location tracker and comparative star visualization area -->
+            <div id="visualHeader" class="p-4 bg-slate-950 border-b border-slate-700 h-[60%] flex flex-col">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="text-xs font-mono text-slate-400">Location Tracking & Star Comparison</div>
+                    <div id="targetCoords" class="text-[10px] text-cyan-500 font-mono"></div>
+                </div>
+                <div id="starPlottingArea" class="flex-1 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
+                    <canvas id="starCanvas" class="w-full h-full"></canvas>
+                    <!-- Tooltip for star hover -->
+                    <div id="starTooltip" class="absolute pointer-events-none bg-slate-950/90 border border-cyan-500/50 text-[10px] text-white p-2 rounded shadow-2xl hidden z-[9999]"></div>
+                </div>
+            </div>
+            
+            <div class="flex-1 relative overflow-hidden" id="skyCanvasContainer">
+                <canvas id="skyCanvas" class="w-full h-full block"></canvas>
+            </div>
+            
+            <!-- FIXED TIMELINE AT CENTRAL BOTTOM -->
+            <div id="timeline" class="h-20 bg-slate-950 border-t border-slate-700 flex items-center justify-between px-6 shrink-0">
+                <button onclick="stepTimeline(-1)" class="p-2 rounded bg-slate-800"><i class="fa-solid fa-backward-step"></i></button>
+                <div class="flex-1 flex flex-col items-center mx-4">
+                    <span id="currentDateLabel" class="text-cyan-400 font-mono text-sm">Epoch 1</span>
+                    <div class="w-full h-2 bg-slate-800 rounded-full mt-1">
+                        <div id="timelineProgress" class="h-full bg-cyan-500 rounded-full" style="width: 10%"></div>
+                    </div>
+                </div>
+                <button onclick="togglePlayTimeline()" id="playPauseBtn" class="p-2 rounded bg-cyan-900/60"><i class="fa-solid fa-pause"></i></button>
+                <button onclick="stepTimeline(1)" class="p-2 rounded bg-slate-800"><i class="fa-solid fa-forward-step"></i></button>
+            </div>
+        </main>
+
+        <!-- RIGHT RAIL: Navigation -->
+        <nav class="panel rail flex flex-col items-center p-2 gap-2" id="rail">
+            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Home"><i class="fa-solid fa-house"></i></button>
+            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Settings"><i class="fa-solid fa-gear"></i></button>
+            <div class="flex-1"></div>
+            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
+        </nav>
+    </div>
+
+    <script>
+        // --- AUTHENTICATION FLOW ---
+        let activeVerifier = '';
+
+        function generateVerifier() {
+            const array = new Uint32Array(56);
+            crypto.getRandomValues(array);
+            return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
+        }
+
+        async function generateChallenge(verifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(verifier);
+            const digest = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            activeVerifier = generateVerifier();
+            const challenge = await generateChallenge(activeVerifier);
+            const callbackUrl = 'spherex-auth://auth-callback';
+            
+            // Constructing URL without trailing slash, per documentation
+            const authUrl = new URL('https://openrouter.ai/auth');
+            authUrl.searchParams.append('callback_url', callbackUrl);
+            authUrl.searchParams.append('code_challenge', challenge);
+            authUrl.searchParams.append('code_challenge_method', 'S256');
+            
+            const finalUrl = authUrl.toString();
+            console.log('Final Auth URL (stringified):', finalUrl);
+            window.spherexAPI.openExternal(finalUrl);
+        });
+
+        window.spherexAPI.onAuthCallback(async (url) => {
+            const params = new URL(url).searchParams;
+            const code = params.get('code');
+            const codeVerifier = localStorage.getItem('pkce_verifier');
+            const result = await window.spherexAPI.exchangeCodeForApiKey({ code, codeVerifier });
+            if (result) {
+                console.log('Successfully authenticated!');
+                document.getElementById('loginOverlay').classList.add('hidden');
+            } else {
+                alert('Authentication failed.');
+            }
+        });
+
+        // --- AUTHENTICATION FLOW ---
+        async function initiatePKCEFlow() {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            const codeVerifier = btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            const encoder = new TextEncoder();
+            const data = encoder.encode(codeVerifier);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            localStorage.setItem('pkce_verifier', codeVerifier);
+            const callbackUrl = "spherex-auth://auth-callback";
+            const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}&code_challenge=${codeChallenge}&code_challenge_method=S256&title=SPHEREx Sky Tool`;
+            await window.spherexAPI.openExternal(authUrl);
+        }
+        
+        document.getElementById('loginBtn').addEventListener('click', initiatePKCEFlow);
+
+        window.spherexAPI.onAuthCallback(async (url) => {
+            const params = new URL(url).searchParams;
+            const code = params.get('code');
+            const codeVerifier = localStorage.getItem('pkce_verifier');
+            const key = await window.spherexAPI.exchangeCodeForApiKey({ code, codeVerifier });
+            if (key) {
+                document.getElementById('authOverlay').classList.add('hidden');
+                console.log('Authenticated');
+            }
+        });
+
+        // Check auth status
+        window.addEventListener('DOMContentLoaded', async () => {
+            const authenticated = await window.spherexAPI.isAuthenticated();
+            if (!authenticated) {
+                document.getElementById('authOverlay').classList.remove('hidden');
+            }
+        });
+
+        // Application State
+        const appState = {
+            zoom: 125,
+            gridVisible: true,
+            showMotionVectors: true,
+            diffMode: false,
+            collection: 'spherex_qr3',
+            currentEpoch: 1,
+            isPlaying: true,
+            realData: [],
+            filters: { band1: true, band2: true, band3: true, band4: true, band5: true, band6: true },
+            currentTarget: null
+        };
+
+        // Initialize Star Plotting Canvas
+        let starCanvas, starCtx;
+        window.addEventListener('DOMContentLoaded', () => {
+            starCanvas = document.getElementById('starCanvas');
+            if (starCanvas) {
+                starCtx = starCanvas.getContext('2d');
+                resizeStarCanvas();
+                window.addEventListener('resize', resizeStarCanvas);
+                
+                // Add hover detection
+                starCanvas.addEventListener('mousemove', handleStarHover);
+                starCanvas.addEventListener('mouseleave', () => {
+                    document.getElementById('starTooltip').classList.add('hidden');
+                });
+            }
+            initCanvas(); // Primary sky canvas
+        });
+
+        function handleStarHover(e) {
+            if (!appState.currentTarget || !starCanvas) return;
+            const rect = starCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const tooltip = document.getElementById('starTooltip');
+
+            const w = starCanvas.width;
+            const h = starCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = 3250; // Wider field of view
+
+            let hoveredObj = null;
+
+            // Check reference stars
+            if (appState.realData) {
+                for (const obj of appState.realData) {
+                    const dx = (obj.ra - appState.currentTarget.ra) * scale;
+                    const dy = (obj.dec - appState.currentTarget.dec) * scale;
+                    const sx = cx + dx;
+                    const sy = cy - dy;
+                    
+                    const dist = Math.sqrt((mx - sx)**2 + (my - sy)**2);
+                    if (dist < 8) {
+                        // Use name or id for background objects
+                        hoveredObj = { ...obj, displayName: obj.name || obj.id || `Ref-${obj.ra.toFixed(3)}` };
+                        break;
+                    }
+                }
+            }
+
+            // Check target star (accounting for epoch offset)
+            const epochOffset = (appState.currentEpoch - 1) * 3;
+            const tx = cx + epochOffset;
+            const ty = cy - (epochOffset * 0.5);
+            const tDist = Math.sqrt((mx - tx)**2 + (my - ty)**2);
+            if (tDist < 10) {
+                hoveredObj = { ...appState.currentTarget, displayName: appState.currentTarget.name, isTarget: true };
+            }
+
+            if (hoveredObj) {
+                tooltip.style.left = (mx + 15) + 'px';
+                tooltip.style.top = (my + 15) + 'px';
+                const constel = getConstellation(hoveredObj.ra, hoveredObj.dec);
+                tooltip.innerHTML = `
+                    <div class="font-bold ${hoveredObj.isTarget ? 'text-cyan-400' : 'text-slate-300'} mb-0.5">${hoveredObj.displayName}</div>
+                    <div class="text-[10px] text-emerald-400 font-semibold mb-1 uppercase tracking-tight">${hoveredObj.type || 'Background Source'}</div>
+                    <div class="text-[9px] text-slate-300 mb-1">Constellation: ${constel}</div>
+                    <div class="grid grid-cols-2 gap-x-2 text-[9px] opacity-80 border-t border-slate-700 pt-1 mt-1">
+                        <div>RA: ${hoveredObj.ra.toFixed(4)}</div>
+                        <div>DEC: ${hoveredObj.dec.toFixed(4)}</div>
+                        ${hoveredObj.mag ? `<div class="col-span-2">Magnitude: ${hoveredObj.mag}</div>` : ''}
+                    </div>
+                    ${hoveredObj.isTarget ? '<div class="text-[8px] text-cyan-500 mt-1 uppercase font-bold text-center border-t border-cyan-500/20 pt-1">Primary Research Target</div>' : ''}
+                `;
+                tooltip.classList.remove('hidden');
+            } else {
+                tooltip.classList.add('hidden');
+            }
+        }
+
+        function resizeStarCanvas() {
+            if (starCanvas) {
+                starCanvas.width = starCanvas.parentElement.clientWidth;
+                starCanvas.height = starCanvas.parentElement.clientHeight;
+                if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+
+        // Fetch Real SPHEREx Catalog Data via TAP
+        async function fetchRealData(ra, dec) {
+            console.log(`Querying real SPHEREx surroundings for RA:${ra} Dec:${dec}...`);
+            
+            // Querying real metadata for surrounding objects within a 0.1 degree radius
+            // We include 'type' and 'id' (mapped as name) for better identification
+            const query = `SELECT TOP 50 ra, dec, mag, type, id FROM spherex_metadata WHERE CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, 0.1))=1`;
+            
+            try {
+                if (window.spherexAPI && window.spherexAPI.queryTAP) {
+                    const res = await window.spherexAPI.queryTAP({ adqlQuery: query });
+                    if (res.success) {
+                        const data = JSON.parse(res.data);
+                        appState.realData = data.data || data; 
+                        console.log(`Loaded ${appState.realData.length} real reference objects.`);
+                    }
+                } else {
+                    // Fallback to simulated reference data if API is unavailable
+                    generateSimulatedSurroundings(ra, dec);
+                }
+            } catch (err) {
+                console.warn('API Fetch failed, using simulation.', err);
+                generateSimulatedSurroundings(ra, dec);
+            }
+            if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+        }
+
+        function generateSimulatedSurroundings(ra, dec) {
+            const seed = ra + dec;
+            const random = (s) => {
+                const x = Math.sin(s) * 10000;
+                return x - Math.floor(x);
+            };
+            const types = ['Main Sequence Star', 'Distant Galaxy', 'Infrared Source', 'Red Dwarf', 'White Dwarf', 'Proto-Star'];
+            appState.realData = [];
+            for (let i = 1; i <= 30; i++) {
+                const r1 = random(seed + i);
+                const r2 = random(seed * i);
+                appState.realData.push({
+                    ra: ra + (r1 - 0.5) * 0.1,
+                    dec: dec + (r2 - 0.5) * 0.1,
+                    mag: (12 + random(seed + i * 2) * 5).toFixed(1),
+                    type: types[Math.floor(random(seed * i * 3) * types.length)],
+                    name: `SPHEREx-ID-${Math.floor(random(seed + i * 4) * 1000000)}`
+                });
+            }
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            if (!query) return;
+
+            const catalog = [
+                { id: 'Barnards-Star', name: 'Barnard\'s Star', ra: 269.452, dec: 4.693, type: 'Red Dwarf', dist: '6.0 ly', mag: '9.5', desc: 'Famous high-proper-motion star in Ophiuchus.', chem: 'Hydrogen, Helium' },
+                { id: 'Epsilon-Indi-B', name: 'Epsilon Indi Ba,Bb', ra: 330.938, dec: -56.772, type: 'Brown Dwarf Pair', dist: '11.8 ly', mag: '14.5', desc: 'Pair of brown dwarfs orbiting a star.', chem: 'Methane (CH4), Water (H2O)' },
+                { id: 'WISE-0855', name: 'WISE 0855-0714', ra: 133.795, dec: -7.245, type: 'Brown Dwarf', dist: '7.2 ly', mag: '16.1', desc: 'Fast-moving, very cold brown dwarf.', chem: 'Water (H2O) Ice, Ammonia' },
+                { id: 'RW-Aurigae', name: 'RW Aurigae', ra: 75.751, dec: 30.407, type: 'Variable Star', dist: '390 ly', mag: '10.5', desc: 'T Tauri variable star system.', chem: 'Carbon Monoxide (CO), Water (H2O)' },
+                { id: 'R-Draconis', name: 'R Draconis', ra: 248.887, dec: 66.721, type: 'Variable Star', dist: '1000 ly', mag: '7.6', desc: 'Mira-type variable star.', chem: 'Titanium Oxide (TiO), Carbon Dioxide (CO2)' },
+                { id: 'COSMOS-Field', name: 'COSMOS Deep Field', ra: 150.119, dec: 2.2058, type: 'Extragalactic', dist: '2.1 Bil ly', mag: '18.4', desc: 'Deep survey field for extragalactic research.', chem: 'Hydrogen, Helium, Carbon' }
+            ];
+
+        // Epoch date mapping
+        const epochDates = {
+            1: "1 November 2025",
+            2: "1 May 2026",
+            3: "1 November 2026",
+            4: "1 May 2027",
+            5: "1 November 2027",
+            6: "1 May 2028"
+        };
+
+            // Fuzzy matching
+            const results = catalog.map(item => {
+                let score = 0;
+                const name = item.name.toLowerCase();
+                const desc = item.desc.toLowerCase();
+                
+                if (name === query) score += 10;
+                else if (name.startsWith(query)) score += 5;
+                else if (name.includes(query)) score += 3;
+                else if (desc.includes(query)) score += 1;
+                
+                return { ...item, score };
+            }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+
+            displayResults(results);
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('resultsList');
+            container.innerHTML = '';
+            results.forEach(obj => {
+                const card = document.createElement('div');
+                card.className = 'p-3 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer transition border border-slate-700 text-sm';
+                card.onclick = () => openDetails(obj);
+                card.innerHTML = `<div class="font-bold text-cyan-400">${obj.name}</div><div class="text-xs text-slate-400">${obj.type}</div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function openDetails(obj) {
+            appState.currentTarget = obj;
+            const content = document.getElementById('panelContent');
+            if (content) {
+                content.innerHTML = `
+                    <div><strong>Name:</strong> <span class="text-cyan-400">${obj.name}</span></div>
+                    <div><strong>Type:</strong> ${obj.type}</div>
+                    <div><strong>RA:</strong> ${obj.ra}°</div>
+                    <div><strong>Dec:</strong> ${obj.dec}°</div>
+                    <div class="pt-2 text-slate-400 italic">${obj.desc}</div>
+                `;
+            }
+            const coordsLabel = document.getElementById('targetCoords');
+            if (coordsLabel) coordsLabel.innerText = `RA ${obj.ra} / DEC ${obj.dec}`;
+            
+            fetchRealData(obj.ra, obj.dec);
+            drawSky(); 
+        }
+
+        // Simple constellation lookup (based on RA/Dec ranges - simplified mapping)
+        function getConstellation(ra, dec) {
+            // Simplified approximation for demonstration
+            if (ra > 180 && ra < 210 && dec > -20 && dec < 20) return "Virgo";
+            if (ra > 260 && ra < 280 && dec > -10 && dec < 10) return "Ophiuchus";
+            if (ra > 70 && ra < 90 && dec > 10 && dec < 40) return "Auriga";
+            return "Unknown";
+        }
+
+        function plotStarAndSurroundings(target) {
+            if (!starCtx) return;
+            const w = starCanvas.width;
+            const h = starCanvas.height;
+            starCtx.clearRect(0, 0, w, h);
+
+            // Draw Background Grid
+            starCtx.strokeStyle = '#1e293b';
+            starCtx.lineWidth = 0.5;
+            for(let x=0; x<w; x+=30) {
+                starCtx.beginPath(); starCtx.moveTo(x,0); starCtx.lineTo(x,h); starCtx.stroke();
+            }
+            for(let y=0; y<h; y+=30) {
+                starCtx.beginPath(); starCtx.moveTo(0,y); starCtx.lineTo(w,y); starCtx.stroke();
+            }
+
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = 3250; // Wider field of view
+
+            // Plot Real Reference Stars (Brighter and larger)
+            appState.realData.forEach(obj => {
+                const dx = (obj.ra - target.ra) * scale;
+                const dy = (obj.dec - target.dec) * scale;
+
+                // Brighter stars: higher base opacity and size
+                const brightness = Math.max(0.6, (18 - obj.mag) / 10);
+                const size = Math.max(3.0, (15 - obj.mag) * 1.2);
+
+                starCtx.fillStyle = `rgba(200, 220, 255, ${brightness})`;
+                starCtx.beginPath();
+                starCtx.arc(cx + dx, cy - dy, size, 0, Math.PI * 2);
+                starCtx.fill();
+            });
+
+
+            // Plot Target Star Position relative to epoch
+            const epochOffset = (appState.currentEpoch - 1) * 3;
+            const tx = cx + epochOffset;
+            const ty = cy - (epochOffset * 0.5);
+
+            starCtx.shadowBlur = 10;
+            starCtx.shadowColor = '#06b6d4';
+            starCtx.fillStyle = '#06b6d4';
+            starCtx.beginPath();
+            starCtx.arc(tx, ty, 5, 0, Math.PI * 2);
+            starCtx.fill();
+            starCtx.shadowBlur = 0;
+
+            starCtx.fillStyle = '#fff';
+            starCtx.font = '10px Inter';
+            starCtx.fillText(target.name + ' (SPHEREx Target)', tx + 8, ty + 3);
+
+            starCtx.setLineDash([2, 2]);
+            starCtx.strokeStyle = '#f97316';
+            starCtx.beginPath();
+            starCtx.arc(cx, cy, 6, 0, Math.PI * 2);
+            starCtx.stroke();
+            starCtx.setLineDash([]);
+        }
+
+        // Logic for primary sky canvas (placeholder or migrated)
+        let skyCanvas, skyCtx;
+        function initCanvas() {
+            skyCanvas = document.getElementById('skyCanvas');
+            if (skyCanvas) skyCtx = skyCanvas.getContext('2d');
+            window.addEventListener('resize', drawSky);
+            drawSky();
+        }
+
+        function drawSky() {
+            if (!skyCtx) return;
+            const w = skyCanvas.width = skyCanvas.parentElement.clientWidth;
+            const h = skyCanvas.height = skyCanvas.parentElement.clientHeight;
+            skyCtx.fillStyle = '#05080f';
+            skyCtx.fillRect(0, 0, w, h);
+            
+            if (!appState.currentTarget) {
+                skyCtx.fillStyle = '#475569';
+                skyCtx.textAlign = 'center';
+                skyCtx.fillText('Select a target to view SPHEREx Survey data', w/2, h/2);
+            } else {
+                const target = appState.currentTarget;
+                // Survey view
+                skyCtx.strokeStyle = '#06b6d4';
+                skyCtx.lineWidth = 1;
+                skyCtx.strokeRect(w/4, h/4, w/2, h/2);
+                
+                // Detailed data display
+                skyCtx.fillStyle = '#fff';
+                skyCtx.font = 'bold 14px Inter';
+                skyCtx.textAlign = 'left';
+                skyCtx.fillText(target.name, 20, 30);
+                
+                skyCtx.font = '12px Inter';
+                skyCtx.fillStyle = '#94a3b8';
+                skyCtx.fillText('Detected Chemicals: ' + target.chem, 20, 50);
+                skyCtx.fillText('Infrared Survey (Bands 1-6): Data Active', 20, 70);
+                
+                skyCtx.fillStyle = '#06b6d4';
+                skyCtx.fillText(`Epoch ${appState.currentEpoch} (${epochDates[appState.currentEpoch]})`, 20, 90);
+            }
+        }
+
+        function togglePlayTimeline() {
+            appState.isPlaying = !appState.isPlaying;
+            document.getElementById('playPauseBtn').innerHTML = appState.isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
+        }
+
+        function stepTimeline(dir) {
+            appState.currentEpoch = Math.max(1, Math.min(6, appState.currentEpoch + dir));
+            const dateStr = epochDates[appState.currentEpoch];
+            document.getElementById('currentDateLabel').innerText = `Epoch ${appState.currentEpoch} (${dateStr})`;
+            document.getElementById('timelineProgress').style.width = (appState.currentEpoch / 6 * 100) + '%';
+            if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+            drawSky();
+        }
+    </script>
+
+
+</body>
+</html>
