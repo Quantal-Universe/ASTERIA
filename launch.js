@@ -119,7 +119,6 @@ function launchApp() {
     console.error('⚠️ Could not launch Electron desktop UI:', err.message);
     startFallbackServer();
   });
-
   electronProcess.on('exit', (code) => {
     if (code !== 0 && code !== null) {
       console.warn(`⚠️ Electron exited with code ${code}. Falling back to Web Server...`);

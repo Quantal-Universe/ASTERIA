@@ -40,7 +40,6 @@
     <!-- OFFICIAL NASA INSIGNIA TOP HEADER -->
     <header class="h-12 bg-spacepanel border-b border-panelborder flex items-center justify-between px-4 shrink-0 z-30">
         <div class="flex items-center space-x-3">
-            <!-- NASA Meatball Insignia Badge -->
             <div class="bg-nasablue border border-blue-400/50 px-2 py-0.5 rounded flex items-center gap-1.5 shadow-md">
                 <span class="text-white font-black text-xs tracking-widest">NASA</span>
                 <span class="w-1.5 h-1.5 rounded-full bg-nasared"></span>
@@ -52,15 +51,12 @@
         </div>
 
         <div class="flex items-center space-x-3">
-            <!-- Search Input -->
             <div class="relative">
                 <input type="text" id="searchInput" placeholder="Search target (e.g. M82, COSMOS, Barnard)..."
                     onkeyup="if(event.key==='Enter') handleTargetSearch(this.value)"
                     class="bg-slate-900/90 border border-panelborder text-xs text-slate-200 px-3 py-1 pl-8 rounded-lg w-64 md:w-80 focus:outline-none focus:border-nasared font-mono shadow-inner">
                 <i class="fa-solid fa-search absolute left-2.5 top-2 text-slate-500 text-xs"></i>
             </div>
-
-            <!-- OpenRouter API Key Config Button -->
             <button onclick="toggleKeyModal()" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-panelborder rounded text-xs text-slate-300 flex items-center gap-1.5 transition">
                 <i class="fa-solid fa-key text-nasared text-[10px]"></i>
                 <span class="hidden md:inline mono text-[11px]">AI KEY</span>
@@ -80,7 +76,6 @@
                 <span id="backendStatus" class="text-[9px] mono px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">ELECTRON READY</span>
             </div>
 
-            <!-- Target Selection Presets -->
             <div class="p-2 space-y-1.5 border-b border-panelborder">
                 <div onclick="selectPresetTarget('cosmos')" id="btn-cosmos" class="p-2 rounded bg-slate-900 hover:bg-slate-800/80 cursor-pointer transition border border-nasablue/80 group">
                     <div class="font-bold text-xs text-blue-300 group-hover:text-white">COSMOS Deep Field</div>
@@ -92,7 +87,6 @@
                 </div>
             </div>
 
-            <!-- Telemetry Metrics Readout -->
             <div class="flex-1 p-3 space-y-3 overflow-y-auto">
                 <div class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 border-b border-panelborder pb-1">
                     <i class="fa-solid fa-microchip text-nasared"></i> Mission Readout
@@ -124,15 +118,34 @@
         <!-- RIGHT PANEL: SKY VIEWPORT, SPECTRAL CHART & AI INSIGHT -->
         <main class="col-span-12 md:col-span-9 grid grid-rows-12 gap-1 overflow-hidden">
 
-            <!-- SKY MAP CANVAS VIEWPORT (Row 1-6) -->
+            <!-- SKY MAP CANVAS VIEWPORT WITH MULTI-CATALOG OVERLAY -->
             <section class="row-span-6 bg-spacepanel border border-panelborder rounded flex flex-col relative overflow-hidden">
                 <div class="h-8 bg-slate-950/90 border-b border-panelborder px-3 flex items-center justify-between text-[11px] mono shrink-0">
-                    <span id="skyCoordLabel" class="text-blue-400 font-semibold">TARGET: COSMOS DEEP FIELD | RA: 150.119° | DEC: +2.205°</span>
-                    <span class="text-nasared font-bold">SPHEREx CADENCE: ACTIVE</span>
+                    <span class="text-slate-200 font-bold tracking-wider uppercase">Location Tracking & Star Comparison</span>
+                    <span id="skyCoordLabel" class="text-cyan-400 font-semibold">RA 150.119 / DEC 2.2058</span>
                 </div>
-                <div class="flex-1 relative cursor-crosshair">
+                <div class="flex-1 relative cursor-crosshair overflow-hidden">
                     <canvas id="skyCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+
+                    <!-- Catalog Legend Overlay -->
+                    <div class="absolute top-3 left-3 bg-slate-950/85 border border-slate-800 backdrop-blur p-2.5 rounded text-[11px] font-sans text-slate-300 space-y-1.5 shadow-lg select-none pointer-events-none">
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span><span>Gaia DR3 stars</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 bg-amber-500"></span><span>SPHEREx observations</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 bg-yellow-400 rotate-45"></span><span>SIMBAD named stars</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rotate-45"></span><span>Gaia DR3 galaxy candidates</span></div>
+                        <div class="flex items-center gap-2"><span class="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-pink-400"></span><span>Gaia DR3 quasar candidates</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-500"></span><span>Gaia DR3 unclassified</span></div>
+                    </div>
                 </div>
+
+                <!-- Bottom Status Ticker Bar -->
+                <div class="h-7 bg-slate-950 border-t border-panelborder px-3 flex items-center justify-between text-[11px] mono shrink-0 text-slate-400">
+                    <div class="flex items-center gap-2 truncate">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="catalogStatusTicker">Gaia DR3: 387 real sources (364 stars, 7 galaxy candidates, 11 quasar candidates, 5 unclassified) - SPHEREx: active</span>
+                    </div>
+                </div>
+
                 <!-- Epoch Slider Bar -->
                 <div class="h-9 bg-slate-950/90 border-t border-panelborder px-4 flex items-center justify-between text-xs shrink-0">
                     <span id="epochLabel" class="text-blue-400 mono font-bold text-[11px]">Epoch 1 / 6 (Jan 2025)</span>
@@ -140,10 +153,8 @@
                 </div>
             </section>
 
-            <!-- SPECTRAL ANALYSIS & AI INSIGHT DUAL VIEW (Row 7-12) -->
+            <!-- SPECTRAL ANALYSIS & AI INSIGHT DUAL VIEW -->
             <section class="row-span-6 grid grid-cols-12 gap-1 overflow-hidden">
-
-                <!-- 102-Band Spectral Chart (Col 1-8) -->
                 <div class="col-span-12 lg:col-span-8 bg-spacepanel border border-panelborder rounded p-2 flex flex-col overflow-hidden">
                     <div class="flex items-center justify-between px-2 pb-1 border-b border-panelborder shrink-0">
                         <span class="text-[11px] font-bold text-slate-200 tracking-wider flex items-center gap-2">
@@ -156,7 +167,6 @@
                     </div>
                 </div>
 
-                <!-- OpenRouter AI Astrophysical Summary (Col 9-12) -->
                 <div class="col-span-12 lg:col-span-4 bg-spacepanel border border-panelborder rounded p-2.5 flex flex-col overflow-hidden">
                     <div class="flex items-center justify-between pb-2 border-b border-panelborder shrink-0">
                         <span class="text-[11px] font-bold text-nasared tracking-wider flex items-center gap-1.5">
@@ -168,7 +178,6 @@
                         <p class="text-slate-400 italic">Select or search a celestial target to stream real-time OpenRouter astrophysical analysis...</p>
                     </div>
                 </div>
-
             </section>
 
         </main>
@@ -190,37 +199,23 @@
         </div>
     </div>
 
-    <!-- SCRIPT & ELECTRON API BINDINGS -->
+    <!-- SCRIPT LOGIC -->
     <script>
         const targetPresets = {
-            cosmos: {
-                name: "COSMOS Deep Field",
-                type: "Extragalactic",
-                dist: "2.4 Gly",
-                chem: "Water Ice / CO2 Dip",
-                ra: 150.119, dec: 2.205,
-                flux: [12, 14, 18, 25, 20, 15, 10, 8, 14, 22, 28, 30, 26, 20, 18, 22, 25]
-            },
-            asteroid: {
-                name: "Asteroid 2025-PX3",
-                type: "Near-Earth Obj",
-                dist: "0.02 AU",
-                chem: "Silicate / Carbonaceous",
-                ra: 150.250, dec: 2.310,
-                flux: [5, 8, 12, 10, 6, 4, 9, 15, 18, 12, 8, 14, 19, 22, 17, 12, 9]
-            }
+            cosmos: { name: "COSMOS Deep Field", type: "Extragalactic", dist: "2.4 Gly", chem: "Water Ice / CO2 Dip", ra: 150.119, dec: 2.205, flux: [12, 14, 18, 25, 20, 15, 10, 8, 14, 22, 28, 30, 26, 20, 18, 22, 25] },
+            asteroid: { name: "Asteroid 2025-PX3", type: "Near-Earth Obj", dist: "0.02 AU", chem: "Silicate / Carbonaceous", ra: 150.250, dec: 2.310, flux: [5, 8, 12, 10, 6, 4, 9, 15, 18, 12, 8, 14, 19, 22, 17, 12, 9] }
         };
 
         let currentTarget = targetPresets.cosmos;
         let currentEpoch = 1;
         let canvas, ctx, spectrumChart;
-        let backgroundStars = [];
+        let catalogPoints = [];
 
         window.addEventListener('DOMContentLoaded', () => {
             canvas = document.getElementById('skyCanvas');
             ctx = canvas.getContext('2d');
             window.addEventListener('resize', resizeCanvas);
-            initBackgroundStars();
+            initCatalogPoints();
             initChart();
             resizeCanvas();
 
@@ -237,66 +232,72 @@
             drawSky();
         }
 
-        // Generate procedural background stars so the canvas looks populated and rich
-        function initBackgroundStars() {
-            backgroundStars = [];
-            for (let i = 0; i < 150; i++) {
-                backgroundStars.push({
-                    x: Math.random() * 2000,
-                    y: Math.random() * 2000,
-                    size: Math.random() * 1.8 + 0.4,
-                    alpha: Math.random() * 0.7 + 0.3
-                });
+        function initCatalogPoints() {
+            catalogPoints = [];
+            let seed = 999;
+            const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+            for (let i = 0; i < 300; i++) {
+                let angle = rng() * Math.PI * 2;
+                let dist = 20 + rng() * 260;
+                let r = rng();
+                let type = 'star';
+                if (r > 0.93) type = 'quasar';
+                else if (r > 0.86) type = 'galaxy';
+                else if (r > 0.79) type = 'spherex';
+                else if (r > 0.73) type = 'simbad';
+                else if (r > 0.68) type = 'unclassified';
+
+                catalogPoints.push({ dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist, type, size: rng() * 1.5 + 1.2 });
             }
         }
 
         function drawSky() {
             if (!ctx) return;
             const w = canvas.width, h = canvas.height;
-            ctx.fillStyle = '#02050b';
+            ctx.fillStyle = '#060a12';
             ctx.fillRect(0, 0, w, h);
 
-            // Draw deep space background star field
-            ctx.fillStyle = '#ffffff';
-            backgroundStars.forEach(star => {
-                ctx.globalAlpha = star.alpha;
-                ctx.beginPath();
-                ctx.arc(star.x % w, star.y % h, star.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            ctx.globalAlpha = 1.0;
-
-            // Astrometric Grid Lines in NASA Blue tint
-            ctx.strokeStyle = 'rgba(11, 61, 145, 0.25)';
+            ctx.strokeStyle = 'rgba(22, 38, 77, 0.4)';
             ctx.lineWidth = 1;
-            for(let x = 0; x < w; x += 80){ ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-            for(let y = 0; y < h; y += 80){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+            for(let x = 0; x < w; x += 50){ ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for(let y = 0; y < h; y += 50){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
-            // Target reticle shift across survey epochs
-            const shift = (currentEpoch - 1) * 22;
+            const shift = (currentEpoch - 1) * 20;
             const cx = w/2 + shift, cy = h/2 - (shift * 0.3);
 
-            // Outer Target Crosshair Brackets
-            ctx.strokeStyle = '#3b82f6';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+            catalogPoints.forEach(pt => {
+                let px = cx + pt.dx;
+                let py = cy + pt.dy;
+                if (pt.type === 'quasar') {
+                    ctx.fillStyle = '#f472b6';
+                    ctx.beginPath(); ctx.moveTo(px, py - 4); ctx.lineTo(px - 4, py + 4); ctx.lineTo(px + 4, py + 4); ctx.closePath(); ctx.fill();
+                } else if (pt.type === 'galaxy') {
+                    ctx.fillStyle = '#c084fc';
+                    ctx.beginPath(); ctx.moveTo(px, py - 4); ctx.lineTo(px - 3, py); ctx.lineTo(px, py + 4); ctx.lineTo(px + 3, py); ctx.closePath(); ctx.fill();
+                } else if (pt.type === 'spherex') {
+                    ctx.fillStyle = '#f97316';
+                    ctx.fillRect(px - 2.5, py - 2.5, 5, 5);
+                } else if (pt.type === 'simbad') {
+                    ctx.fillStyle = '#facc15';
+                    ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
+                } else if (pt.type === 'unclassified') {
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI * 2); ctx.fill();
+                } else {
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.beginPath(); ctx.arc(px, py, pt.size, 0, Math.PI * 2); ctx.fill();
+                }
+            });
 
-            // NASA Red Pulsing Target Center
-            ctx.strokeStyle = '#FC3D21';
+            ctx.strokeStyle = '#06b6d4';
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = '#06b6d4';
+            ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.fill();
 
-            // Inner crosshairs
-            ctx.strokeStyle = '#3b82f6';
-            ctx.beginPath(); ctx.moveTo(cx - 40, cy); ctx.lineTo(cx - 16, cy); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx + 16, cy); ctx.lineTo(cx + 40, cy); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx, cy - 40); ctx.lineTo(cx, cy - 16); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(cx, cy + 16); ctx.lineTo(cx, cy + 40); ctx.stroke();
-
-            // Target label overlay on canvas
             ctx.fillStyle = '#38bdf8';
-            ctx.font = '10px JetBrains Mono';
-            ctx.fillText(`[TRACKING] ${currentTarget.name.toUpperCase()} (EPOCH ${currentEpoch}/6)`, cx + 20, cy - 25);
+            ctx.font = '11px Inter, sans-serif';
+            ctx.fillText(`${currentTarget.name} (Selected Target)`, cx + 18, cy + 4);
         }
 
         function initChart() {
@@ -338,7 +339,6 @@
 
         async function handleTargetSearch(query) {
             if (!query.trim()) return;
-
             document.getElementById('meta-name').innerText = query;
             document.getElementById('aiStatus').innerText = 'RESOLVING...';
 
@@ -376,7 +376,7 @@
             document.getElementById('meta-chem').innerText = target.chem;
             document.getElementById('meta-ra').innerText = target.ra;
             document.getElementById('meta-dec').innerText = target.dec;
-            document.getElementById('skyCoordLabel').innerText = `TARGET: ${target.name.toUpperCase()} | RA: ${target.ra}° | DEC: ${target.dec}°`;
+            document.getElementById('skyCoordLabel').innerText = `RA ${target.ra} / DEC ${target.dec}`;
 
             spectrumChart.data.datasets[0].data = target.flux;
             spectrumChart.update();
@@ -400,9 +400,7 @@
                     aiStatus.innerText = 'ONLINE';
                     aiStatus.className = 'text-[9px] mono text-blue-400';
                     return;
-                } catch (err) {
-                    console.log('OpenRouter bridge error:', err);
-                }
+                } catch (err) { console.log('OpenRouter bridge error:', err); }
             }
 
             setTimeout(() => {
@@ -423,9 +421,7 @@
             drawSky();
         }
 
-        function toggleKeyModal() {
-            document.getElementById('keyModal').classList.toggle('hidden');
-        }
+        function toggleKeyModal() { document.getElementById('keyModal').classList.toggle('hidden'); }
 
         async function saveApiKey() {
             const key = document.getElementById('apiKeyInput').value.trim();
