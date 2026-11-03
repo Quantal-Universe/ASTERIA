@@ -7,9 +7,7 @@ const os = require('os');
 const { exec } = require('child_process');
 const http = require('http');
 
-// Fix: check if it's the class or a module wrapper
-const StoreClass = typeof Store === 'function' ? Store : (Store.default || Store.Store || Store);
-const store = new StoreClass();
+let store;
 
 // Auth callback server
 const authServer = http.createServer((req, res) => {
@@ -81,20 +79,27 @@ async function fetchURL(targetUrl, options = {}) {
 }
 
 // --- AUTHENTICATION & AI HANDLERS ---
-ipcMain.handle('get-openrouter-key', () => store.get('openrouterApiKey') || '');
-ipcMain.handle('set-openrouter-key', (event, apiKey) => { store.set('openrouterApiKey', apiKey); return true; });
-ipcMain.handle('is-authenticated', () => !!store.get('openrouterApiKey'));
-ipcMain.handle('logout', () => { store.delete('openrouterApiKey'); });
+ipcMain.handle('get-openrouter-key', () => store ? store.get('openrouterApiKey') || '' : '');
+ipcMain.handle('set-openrouter-key', (event, apiKey) => { if (store) store.set('openrouterApiKey', apiKey); return true; });
+ipcMain.handle('set-api-key', (event, apiKey) => { if (store) store.set('openrouterApiKey', apiKey); return true; });
+ipcMain.handle('is-authenticated', () => store ? !!store.get('openrouterApiKey') : false);
+ipcMain.handle('logout', () => { if (store) store.delete('openrouterApiKey'); });
 
-ipcMain.handle('call-openrouter-api', async (event, { messages, model, systemPrompt }) => {
-  const apiKey = store.get('openrouterApiKey');
+ipcMain.handle('call-openrouter-api', async (event, params) => {
+  const apiKey = store ? store.get('openrouterApiKey') : '';
   if (!apiKey) throw new Error('OpenRouter API key not configured');
 
+  const messages = params.messages || [
+    { role: 'user', content: params.prompt || 'Provide a brief astrophysical target breakdown.' }
+  ];
+
+  const systemPrompt = params.systemPrompt || 'You are an expert NASA astrophysicist analyzing SPHEREx infrared survey data.';
+
   const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-    model: model || 'anthropic/claude-3.5-sonnet',
-    messages: [...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []), ...messages],
+    model: params.model || 'deepseek/deepseek-chat',
+    messages: [{ role: 'system', content: systemPrompt }, ...messages],
     temperature: 0.7
-  }, { 
+  }, {
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
   });
   return response.data;
@@ -106,7 +111,7 @@ ipcMain.handle('exchange-code-for-key', async (event, { code, codeVerifier }) =>
     code_verifier: codeVerifier,
     code_challenge_method: "S256"
   }, { headers: { 'Content-Type': 'application/json' } });
-  store.set('openrouterApiKey', response.data.key);
+  if (store) store.set('openrouterApiKey', response.data.key);
   return response.data.key;
 });
 
@@ -126,7 +131,6 @@ ipcMain.handle('spherex:search-sia2', async (event, { collection = 'spherex_qr3'
     });
 
     if (res.status >= 200 && res.status < 300) {
-      // Regex to extract the first access_url from the VOTable table data
       const urlMatch = res.data.match(/(https:\/\/irsa\.ipac\.caltech\.edu\/ibe\/data\/spherex\/[^<"\s]+)/);
       const imageUrl = urlMatch ? urlMatch[1] : null;
 
@@ -176,7 +180,6 @@ ipcMain.handle('spherex:query-tap', async (event, { adqlQuery }) => {
 ipcMain.handle('spherex:resolve-object', async (event, query) => {
   try {
     const trimmed = query.trim();
-    // Direct coordinate check (e.g. "150.119, 2.2058" or "05 35 17 -05 23 28")
     const coordMatch = trimmed.match(/^([+-]?\d+\.?\d*)[,\s]+([+-]?\d+\.?\d*)$/);
     if (coordMatch) {
       return {
@@ -188,12 +191,10 @@ ipcMain.handle('spherex:resolve-object', async (event, query) => {
       };
     }
 
-    // CDS Sesame Resolver
     const url = `https://cds.unistra.fr/cgi-bin/nph-sesame/-I?${encodeURIComponent(trimmed)}`;
     const res = await fetchURL(url);
 
     if (res.data) {
-      // Parse RA / Dec from Sesame response
       const raMatch = res.data.match(/%J\s+([0-9\.]+)\s+([+-]?[0-9\.]+)/);
       if (raMatch) {
         return {
@@ -206,7 +207,6 @@ ipcMain.handle('spherex:resolve-object', async (event, query) => {
       }
     }
 
-    // Fallback dictionary for popular SPHEREx targets
     const knownTargets = {
       'cosmos': { ra: 150.119, dec: 2.2058, name: 'COSMOS Deep Field' },
       'm82': { ra: 148.968, dec: 69.679, name: 'M82 Starburst Core' },
@@ -241,6 +241,10 @@ ipcMain.handle('spherex:fetch-ibe', async (event, { path = 'qr3' }) => {
 });
 
 app.whenReady().then(() => {
+  // Initialize store safely once Electron app is ready
+  const StoreClass = typeof Store === 'function' ? Store : (Store.default || Store.Store || Store);
+  store = new StoreClass({ cwd: app.getPath('userData') });
+
   createWindow();
 
   app.on('activate', () => {

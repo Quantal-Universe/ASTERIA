@@ -1,551 +1,439 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-    <meta charset="utf-8">
-    <title>SPHEREx Sky Survey Research Tool - NASA Time-Domain Explorer</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    
-    <!-- Tailwind CSS (retained for layout compatibility) -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASTREIA · NASA SPHEREx Mission Control Terminal</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-        :root {
-            /* Layout variables from layout.html */
-            --bg: #0d1120;
-            --card: #161c30;
-            --ink: #e8ecf8;
-            --mute: #98a2bf;
-            --line: #263050;
-            --acc: #8b87ff;
-            --accs: #26264d;
-            --sh: 0 1px 3px rgba(0,0,0,.4);
-            --sky: #0b1020;
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        nasablue: '#0B3D91',
+                        nasared: '#FC3D21',
+                        spacebg: '#02050b',
+                        spacepanel: '#070f22',
+                        panelborder: '#16264d'
+                    }
+                }
+            }
         }
-        body { background: var(--bg); color: var(--ink); font-family: Inter, sans-serif; font-size: 15px; height: 100vh; margin: 0; }
-        #app { display: grid; grid-template-columns: 35% minmax(0,1fr) 64px; height: 100%; gap: 16px; padding: 16px; }
-        .panel { background: var(--card); border-radius: 20px; box-shadow: var(--sh); border: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
-        
-        /* Integration styles */
+    </script>
+    <!-- Chart.js for 102-Band Spectral Data -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--sky); }
-        ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #02050b; }
+        ::-webkit-scrollbar-thumb { background: #16264d; border-radius: 2px; }
     </style>
 </head>
-<body>
-    <!-- Login Modal -->
-    <div id="loginOverlay" class="fixed inset-0 bg-slate-950/90 z-[10000] flex items-center justify-center">
-        <div class="bg-slate-900 p-8 rounded-xl border border-slate-700 text-center space-y-4">
-            <h2 class="text-2xl font-bold text-white">Unlock AI Discovery</h2>
-            <p class="text-slate-400">Login with OpenRouter to enable AI-powered analysis.</p>
-            <button id="loginBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg">Login with OpenRouter</button>
+<body class="bg-spacebg text-slate-200 h-screen w-screen overflow-hidden flex flex-col select-none">
+
+    <!-- OFFICIAL NASA INSIGNIA TOP HEADER -->
+    <header class="h-12 bg-spacepanel border-b border-panelborder flex items-center justify-between px-4 shrink-0 z-30">
+        <div class="flex items-center space-x-3">
+            <!-- NASA Meatball Insignia Badge -->
+            <div class="bg-nasablue border border-blue-400/50 px-2 py-0.5 rounded flex items-center gap-1.5 shadow-md">
+                <span class="text-white font-black text-xs tracking-widest">NASA</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-nasared"></span>
+            </div>
+            <div class="flex items-baseline space-x-2">
+                <span class="font-black text-sm tracking-widest text-white">ASTREIA</span>
+                <span class="text-[10px] text-blue-400 mono hidden sm:inline">SPHEREx TIME-DOMAIN EXPLORER</span>
+            </div>
         </div>
-    </div>
-    
-    <div id="app">
-        <!-- LEFT PANEL: Search results (Fixed top) -->
-        <aside class="panel" id="left">
-            <div class="p-4 border-b border-slate-700 bg-slate-900">
-                <h1 class="text-lg font-bold mb-3 flex items-center gap-2">
-                    <i class="fa-solid fa-layer-group text-cyan-400"></i> Research Dashboard
-                </h1>
-                <div class="flex items-center gap-2 border border-slate-700 rounded-lg px-3 py-2 bg-slate-950">
-                    <i class="fa-solid fa-search text-slate-500"></i>
-                    <input type="text" id="searchInput" placeholder="Search targets..." onkeyup="if(event.key === 'Enter') handleSearch()" class="bg-transparent border-none outline-none w-full text-sm">
+
+        <div class="flex items-center space-x-3">
+            <!-- Search Input -->
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="Search target (e.g. M82, COSMOS, Barnard)..."
+                    onkeyup="if(event.key==='Enter') handleTargetSearch(this.value)"
+                    class="bg-slate-900/90 border border-panelborder text-xs text-slate-200 px-3 py-1 pl-8 rounded-lg w-64 md:w-80 focus:outline-none focus:border-nasared font-mono shadow-inner">
+                <i class="fa-solid fa-search absolute left-2.5 top-2 text-slate-500 text-xs"></i>
+            </div>
+
+            <!-- OpenRouter API Key Config Button -->
+            <button onclick="toggleKeyModal()" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-panelborder rounded text-xs text-slate-300 flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-key text-nasared text-[10px]"></i>
+                <span class="hidden md:inline mono text-[11px]">AI KEY</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- DASHBOARD CONTENT GRID -->
+    <div class="flex-1 grid grid-cols-12 overflow-hidden gap-1 p-1 bg-spacebg">
+
+        <!-- LEFT PANEL: TARGET CATALOG & TELEMETRY -->
+        <aside class="col-span-12 md:col-span-3 bg-spacepanel border border-panelborder rounded flex flex-col overflow-hidden">
+            <div class="p-2.5 border-b border-panelborder bg-slate-900/50 flex justify-between items-center">
+                <span class="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-satellite-dish text-nasared"></i> Target Telemetry
+                </span>
+                <span id="backendStatus" class="text-[9px] mono px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">ELECTRON READY</span>
+            </div>
+
+            <!-- Target Selection Presets -->
+            <div class="p-2 space-y-1.5 border-b border-panelborder">
+                <div onclick="selectPresetTarget('cosmos')" id="btn-cosmos" class="p-2 rounded bg-slate-900 hover:bg-slate-800/80 cursor-pointer transition border border-nasablue/80 group">
+                    <div class="font-bold text-xs text-blue-300 group-hover:text-white">COSMOS Deep Field</div>
+                    <div class="text-[10px] text-slate-400 mono">RA 150.119° / DEC +2.205°</div>
+                </div>
+                <div onclick="selectPresetTarget('asteroid')" id="btn-asteroid" class="p-2 rounded bg-slate-900 hover:bg-slate-800/80 cursor-pointer transition border border-panelborder group">
+                    <div class="font-bold text-xs text-slate-300 group-hover:text-nasared">Asteroid 2025-PX3</div>
+                    <div class="text-[10px] text-slate-400 mono">High Proper Motion Vector</div>
                 </div>
             </div>
-            <div id="resultsList" class="flex-1 overflow-y-auto p-4 space-y-2">
-                <!-- Search results injected here -->
-            </div>
-            <!-- RESTORED DETAILS AREA IN LEFT PANEL -->
-            <div id="detailsArea" class="p-4 border-t border-slate-700 bg-slate-900/80">
-                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Object Info</h3>
-                <div id="panelContent" class="text-xs space-y-1">Select an object to see details.</div>
+
+            <!-- Telemetry Metrics Readout -->
+            <div class="flex-1 p-3 space-y-3 overflow-y-auto">
+                <div class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2 border-b border-panelborder pb-1">
+                    <i class="fa-solid fa-microchip text-nasared"></i> Mission Readout
+                </div>
+
+                <div class="space-y-2 mono text-xs">
+                    <div class="bg-slate-900/80 p-2 rounded border border-panelborder">
+                        <span class="text-[10px] text-slate-400 block uppercase">Target Name</span>
+                        <span id="meta-name" class="font-bold text-white">COSMOS Deep Field</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-slate-900/80 p-2 rounded border border-panelborder">
+                            <span class="text-[10px] text-slate-400 block uppercase">R.A. (Deg)</span>
+                            <span id="meta-ra" class="text-blue-400 font-semibold">150.119</span>
+                        </div>
+                        <div class="bg-slate-900/80 p-2 rounded border border-panelborder">
+                            <span class="text-[10px] text-slate-400 block uppercase">Dec (Deg)</span>
+                            <span id="meta-dec" class="text-blue-300 font-semibold">+2.205</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/80 p-2 rounded border border-panelborder">
+                        <span class="text-[10px] text-slate-400 block uppercase">Spectral Signature</span>
+                        <span id="meta-chem" class="text-nasared font-semibold">Water Ice / CO2 Dip</span>
+                    </div>
+                </div>
             </div>
         </aside>
 
-        <!-- CENTRAL VIEW: Canvas & Visuals -->
-        <main class="panel" id="main">
-            <!-- Location tracker and comparative star visualization area -->
-            <div id="visualHeader" class="p-4 bg-slate-950 border-b border-slate-700 h-[60%] flex flex-col">
-                <div class="flex justify-between items-center mb-2">
-                    <div class="text-xs font-mono text-slate-400">Location Tracking & Star Comparison</div>
-                    <div id="targetCoords" class="text-[10px] text-cyan-500 font-mono"></div>
+        <!-- RIGHT PANEL: SKY VIEWPORT, SPECTRAL CHART & AI INSIGHT -->
+        <main class="col-span-12 md:col-span-9 grid grid-rows-12 gap-1 overflow-hidden">
+
+            <!-- SKY MAP CANVAS VIEWPORT (Row 1-6) -->
+            <section class="row-span-6 bg-spacepanel border border-panelborder rounded flex flex-col relative overflow-hidden">
+                <div class="h-8 bg-slate-950/90 border-b border-panelborder px-3 flex items-center justify-between text-[11px] mono shrink-0">
+                    <span id="skyCoordLabel" class="text-blue-400 font-semibold">TARGET: COSMOS DEEP FIELD | RA: 150.119° | DEC: +2.205°</span>
+                    <span class="text-nasared font-bold">SPHEREx CADENCE: ACTIVE</span>
                 </div>
-                <div id="starPlottingArea" class="flex-1 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
-                    <canvas id="starCanvas" class="w-full h-full"></canvas>
-                    <!-- Tooltip for star hover -->
-                    <div id="starTooltip" class="absolute pointer-events-none bg-slate-950/90 border border-cyan-500/50 text-[10px] text-white p-2 rounded shadow-2xl hidden z-[9999]"></div>
+                <div class="flex-1 relative cursor-crosshair">
+                    <canvas id="skyCanvas" class="absolute inset-0 w-full h-full block"></canvas>
                 </div>
-            </div>
-            
-            <div class="flex-1 relative overflow-hidden" id="skyCanvasContainer">
-                <canvas id="skyCanvas" class="w-full h-full block"></canvas>
-            </div>
-            
-            <!-- FIXED TIMELINE AT CENTRAL BOTTOM -->
-            <div id="timeline" class="h-20 bg-slate-950 border-t border-slate-700 flex items-center justify-between px-6 shrink-0">
-                <button onclick="stepTimeline(-1)" class="p-2 rounded bg-slate-800"><i class="fa-solid fa-backward-step"></i></button>
-                <div class="flex-1 flex flex-col items-center mx-4">
-                    <span id="currentDateLabel" class="text-cyan-400 font-mono text-sm">Epoch 1</span>
-                    <div class="w-full h-2 bg-slate-800 rounded-full mt-1">
-                        <div id="timelineProgress" class="h-full bg-cyan-500 rounded-full" style="width: 10%"></div>
+                <!-- Epoch Slider Bar -->
+                <div class="h-9 bg-slate-950/90 border-t border-panelborder px-4 flex items-center justify-between text-xs shrink-0">
+                    <span id="epochLabel" class="text-blue-400 mono font-bold text-[11px]">Epoch 1 / 6 (Jan 2025)</span>
+                    <input type="range" id="epochSlider" min="1" max="6" value="1" oninput="updateEpoch(this.value)" class="w-1/2 accent-nasared cursor-pointer">
+                </div>
+            </section>
+
+            <!-- SPECTRAL ANALYSIS & AI INSIGHT DUAL VIEW (Row 7-12) -->
+            <section class="row-span-6 grid grid-cols-12 gap-1 overflow-hidden">
+
+                <!-- 102-Band Spectral Chart (Col 1-8) -->
+                <div class="col-span-12 lg:col-span-8 bg-spacepanel border border-panelborder rounded p-2 flex flex-col overflow-hidden">
+                    <div class="flex items-center justify-between px-2 pb-1 border-b border-panelborder shrink-0">
+                        <span class="text-[11px] font-bold text-slate-200 tracking-wider flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-blue-400"></i> SPHEREx 102-Band IR Spectrum (0.75µm - 5.0µm)
+                        </span>
+                        <span class="text-[10px] mono text-slate-400">FLUX vs WAVELENGTH</span>
+                    </div>
+                    <div class="flex-1 relative w-full h-full pt-1">
+                        <canvas id="spectrumChart"></canvas>
                     </div>
                 </div>
-                <button onclick="togglePlayTimeline()" id="playPauseBtn" class="p-2 rounded bg-cyan-900/60"><i class="fa-solid fa-pause"></i></button>
-                <button onclick="stepTimeline(1)" class="p-2 rounded bg-slate-800"><i class="fa-solid fa-forward-step"></i></button>
-            </div>
-        </main>
 
-        <!-- RIGHT RAIL: Navigation -->
-        <nav class="panel rail flex flex-col items-center p-2 gap-2" id="rail">
-            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Home"><i class="fa-solid fa-house"></i></button>
-            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Settings"><i class="fa-solid fa-gear"></i></button>
-            <div class="flex-1"></div>
-            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
-        </nav>
+                <!-- OpenRouter AI Astrophysical Summary (Col 9-12) -->
+                <div class="col-span-12 lg:col-span-4 bg-spacepanel border border-panelborder rounded p-2.5 flex flex-col overflow-hidden">
+                    <div class="flex items-center justify-between pb-2 border-b border-panelborder shrink-0">
+                        <span class="text-[11px] font-bold text-nasared tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-brain"></i> OpenRouter AI Insight
+                        </span>
+                        <span id="aiStatus" class="text-[9px] mono text-slate-400">STANDBY</span>
+                    </div>
+                    <div id="aiSummaryBox" class="flex-1 overflow-y-auto pt-2 text-xs text-slate-300 mono leading-relaxed space-y-2">
+                        <p class="text-slate-400 italic">Select or search a celestial target to stream real-time OpenRouter astrophysical analysis...</p>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
     </div>
 
+    <!-- OPENROUTER API KEY MODAL -->
+    <div id="keyModal" class="fixed inset-0 bg-spacebg/80 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-spacepanel border border-panelborder rounded-xl p-5 w-96 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-panelborder pb-2">
+                <h3 class="font-bold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-key text-nasared"></i> OpenRouter Key Config</h3>
+                <button onclick="toggleKeyModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-400">Enter your OpenRouter key to enable automated AI astrophysical summaries for queried targets.</p>
+            <input type="password" id="apiKeyInput" placeholder="sk-or-v1-..." class="w-full bg-slate-900 border border-panelborder rounded p-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-nasared">
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="toggleKeyModal()" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">Cancel</button>
+                <button onclick="saveApiKey()" class="px-3 py-1.5 rounded bg-nasared hover:bg-red-600 text-xs text-white font-semibold">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT & ELECTRON API BINDINGS -->
     <script>
-        // --- AUTHENTICATION FLOW ---
-        let activeVerifier = '';
-
-        function generateVerifier() {
-            const array = new Uint32Array(56);
-            crypto.getRandomValues(array);
-            return Array.from(array, dec => ('0' + dec.toString(16)).substr(-2)).join('');
-        }
-
-        async function generateChallenge(verifier) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(verifier);
-            const digest = await crypto.subtle.digest('SHA-256', data);
-            return btoa(String.fromCharCode(...new Uint8Array(digest)))
-                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        }
-
-        document.getElementById('loginBtn').addEventListener('click', async () => {
-            activeVerifier = generateVerifier();
-            const challenge = await generateChallenge(activeVerifier);
-            const callbackUrl = 'spherex-auth://auth-callback';
-            
-            // Constructing URL without trailing slash, per documentation
-            const authUrl = new URL('https://openrouter.ai/auth');
-            authUrl.searchParams.append('callback_url', callbackUrl);
-            authUrl.searchParams.append('code_challenge', challenge);
-            authUrl.searchParams.append('code_challenge_method', 'S256');
-            
-            const finalUrl = authUrl.toString();
-            console.log('Final Auth URL (stringified):', finalUrl);
-            window.spherexAPI.openExternal(finalUrl);
-        });
-
-        window.spherexAPI.onAuthCallback(async (url) => {
-            const params = new URL(url).searchParams;
-            const code = params.get('code');
-            const codeVerifier = localStorage.getItem('pkce_verifier');
-            const result = await window.spherexAPI.exchangeCodeForApiKey({ code, codeVerifier });
-            if (result) {
-                console.log('Successfully authenticated!');
-                document.getElementById('loginOverlay').classList.add('hidden');
-            } else {
-                alert('Authentication failed.');
+        const targetPresets = {
+            cosmos: {
+                name: "COSMOS Deep Field",
+                type: "Extragalactic",
+                dist: "2.4 Gly",
+                chem: "Water Ice / CO2 Dip",
+                ra: 150.119, dec: 2.205,
+                flux: [12, 14, 18, 25, 20, 15, 10, 8, 14, 22, 28, 30, 26, 20, 18, 22, 25]
+            },
+            asteroid: {
+                name: "Asteroid 2025-PX3",
+                type: "Near-Earth Obj",
+                dist: "0.02 AU",
+                chem: "Silicate / Carbonaceous",
+                ra: 150.250, dec: 2.310,
+                flux: [5, 8, 12, 10, 6, 4, 9, 15, 18, 12, 8, 14, 19, 22, 17, 12, 9]
             }
-        });
-
-        // --- AUTHENTICATION FLOW ---
-        async function initiatePKCEFlow() {
-            const array = new Uint8Array(32);
-            crypto.getRandomValues(array);
-            const codeVerifier = btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-            const encoder = new TextEncoder();
-            const data = encoder.encode(codeVerifier);
-            const hash = await crypto.subtle.digest('SHA-256', data);
-            const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-            localStorage.setItem('pkce_verifier', codeVerifier);
-            const callbackUrl = "spherex-auth://auth-callback";
-            const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}&code_challenge=${codeChallenge}&code_challenge_method=S256&title=SPHEREx Sky Tool`;
-            await window.spherexAPI.openExternal(authUrl);
-        }
-        
-        document.getElementById('loginBtn').addEventListener('click', initiatePKCEFlow);
-
-        window.spherexAPI.onAuthCallback(async (url) => {
-            const params = new URL(url).searchParams;
-            const code = params.get('code');
-            const codeVerifier = localStorage.getItem('pkce_verifier');
-            const key = await window.spherexAPI.exchangeCodeForApiKey({ code, codeVerifier });
-            if (key) {
-                document.getElementById('authOverlay').classList.add('hidden');
-                console.log('Authenticated');
-            }
-        });
-
-        // Check auth status
-        window.addEventListener('DOMContentLoaded', async () => {
-            const authenticated = await window.spherexAPI.isAuthenticated();
-            if (!authenticated) {
-                document.getElementById('authOverlay').classList.remove('hidden');
-            }
-        });
-
-        // Application State
-        const appState = {
-            zoom: 125,
-            gridVisible: true,
-            showMotionVectors: true,
-            diffMode: false,
-            collection: 'spherex_qr3',
-            currentEpoch: 1,
-            isPlaying: true,
-            realData: [],
-            filters: { band1: true, band2: true, band3: true, band4: true, band5: true, band6: true },
-            currentTarget: null
         };
 
-        // Initialize Star Plotting Canvas
-        let starCanvas, starCtx;
+        let currentTarget = targetPresets.cosmos;
+        let currentEpoch = 1;
+        let canvas, ctx, spectrumChart;
+        let backgroundStars = [];
+
         window.addEventListener('DOMContentLoaded', () => {
-            starCanvas = document.getElementById('starCanvas');
-            if (starCanvas) {
-                starCtx = starCanvas.getContext('2d');
-                resizeStarCanvas();
-                window.addEventListener('resize', resizeStarCanvas);
-                
-                // Add hover detection
-                starCanvas.addEventListener('mousemove', handleStarHover);
-                starCanvas.addEventListener('mouseleave', () => {
-                    document.getElementById('starTooltip').classList.add('hidden');
-                });
+            canvas = document.getElementById('skyCanvas');
+            ctx = canvas.getContext('2d');
+            window.addEventListener('resize', resizeCanvas);
+            initBackgroundStars();
+            initChart();
+            resizeCanvas();
+
+            if (window.spherexAPI) {
+                document.getElementById('backendStatus').innerText = 'ELECTRON CONNECTED';
+            } else {
+                document.getElementById('backendStatus').innerText = 'STANDALONE MODE';
             }
-            initCanvas(); // Primary sky canvas
         });
 
-        function handleStarHover(e) {
-            if (!appState.currentTarget || !starCanvas) return;
-            const rect = starCanvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
-            const tooltip = document.getElementById('starTooltip');
-
-            const w = starCanvas.width;
-            const h = starCanvas.height;
-            const cx = w / 2;
-            const cy = h / 2;
-            const scale = 3250; // Wider field of view
-
-            let hoveredObj = null;
-
-            // Check reference stars
-            if (appState.realData) {
-                for (const obj of appState.realData) {
-                    const dx = (obj.ra - appState.currentTarget.ra) * scale;
-                    const dy = (obj.dec - appState.currentTarget.dec) * scale;
-                    const sx = cx + dx;
-                    const sy = cy - dy;
-                    
-                    const dist = Math.sqrt((mx - sx)**2 + (my - sy)**2);
-                    if (dist < 8) {
-                        // Use name or id for background objects
-                        hoveredObj = { ...obj, displayName: obj.name || obj.id || `Ref-${obj.ra.toFixed(3)}` };
-                        break;
-                    }
-                }
-            }
-
-            // Check target star (accounting for epoch offset)
-            const epochOffset = (appState.currentEpoch - 1) * 3;
-            const tx = cx + epochOffset;
-            const ty = cy - (epochOffset * 0.5);
-            const tDist = Math.sqrt((mx - tx)**2 + (my - ty)**2);
-            if (tDist < 10) {
-                hoveredObj = { ...appState.currentTarget, displayName: appState.currentTarget.name, isTarget: true };
-            }
-
-            if (hoveredObj) {
-                tooltip.style.left = (mx + 15) + 'px';
-                tooltip.style.top = (my + 15) + 'px';
-                const constel = getConstellation(hoveredObj.ra, hoveredObj.dec);
-                tooltip.innerHTML = `
-                    <div class="font-bold ${hoveredObj.isTarget ? 'text-cyan-400' : 'text-slate-300'} mb-0.5">${hoveredObj.displayName}</div>
-                    <div class="text-[10px] text-emerald-400 font-semibold mb-1 uppercase tracking-tight">${hoveredObj.type || 'Background Source'}</div>
-                    <div class="text-[9px] text-slate-300 mb-1">Constellation: ${constel}</div>
-                    <div class="grid grid-cols-2 gap-x-2 text-[9px] opacity-80 border-t border-slate-700 pt-1 mt-1">
-                        <div>RA: ${hoveredObj.ra.toFixed(4)}</div>
-                        <div>DEC: ${hoveredObj.dec.toFixed(4)}</div>
-                        ${hoveredObj.mag ? `<div class="col-span-2">Magnitude: ${hoveredObj.mag}</div>` : ''}
-                    </div>
-                    ${hoveredObj.isTarget ? '<div class="text-[8px] text-cyan-500 mt-1 uppercase font-bold text-center border-t border-cyan-500/20 pt-1">Primary Research Target</div>' : ''}
-                `;
-                tooltip.classList.remove('hidden');
-            } else {
-                tooltip.classList.add('hidden');
-            }
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            drawSky();
         }
 
-        function resizeStarCanvas() {
-            if (starCanvas) {
-                starCanvas.width = starCanvas.parentElement.clientWidth;
-                starCanvas.height = starCanvas.parentElement.clientHeight;
-                if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
-            }
-        }
-
-        // --- CORE FUNCTIONS ---
-
-        // Fetch Real SPHEREx Catalog Data via TAP
-        async function fetchRealData(ra, dec) {
-            console.log(`Querying real SPHEREx surroundings for RA:${ra} Dec:${dec}...`);
-            
-            // Querying real metadata for surrounding objects within a 0.1 degree radius
-            // We include 'type' and 'id' (mapped as name) for better identification
-            const query = `SELECT TOP 50 ra, dec, mag, type, id FROM spherex_metadata WHERE CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, 0.1))=1`;
-            
-            try {
-                if (window.spherexAPI && window.spherexAPI.queryTAP) {
-                    const res = await window.spherexAPI.queryTAP({ adqlQuery: query });
-                    if (res.success) {
-                        const data = JSON.parse(res.data);
-                        appState.realData = data.data || data; 
-                        console.log(`Loaded ${appState.realData.length} real reference objects.`);
-                    }
-                } else {
-                    // Fallback to simulated reference data if API is unavailable
-                    generateSimulatedSurroundings(ra, dec);
-                }
-            } catch (err) {
-                console.warn('API Fetch failed, using simulation.', err);
-                generateSimulatedSurroundings(ra, dec);
-            }
-            if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
-        }
-
-        function generateSimulatedSurroundings(ra, dec) {
-            const seed = ra + dec;
-            const random = (s) => {
-                const x = Math.sin(s) * 10000;
-                return x - Math.floor(x);
-            };
-            const types = ['Main Sequence Star', 'Distant Galaxy', 'Infrared Source', 'Red Dwarf', 'White Dwarf', 'Proto-Star'];
-            appState.realData = [];
-            for (let i = 1; i <= 30; i++) {
-                const r1 = random(seed + i);
-                const r2 = random(seed * i);
-                appState.realData.push({
-                    ra: ra + (r1 - 0.5) * 0.1,
-                    dec: dec + (r2 - 0.5) * 0.1,
-                    mag: (12 + random(seed + i * 2) * 5).toFixed(1),
-                    type: types[Math.floor(random(seed * i * 3) * types.length)],
-                    name: `SPHEREx-ID-${Math.floor(random(seed + i * 4) * 1000000)}`
+        // Generate procedural background stars so the canvas looks populated and rich
+        function initBackgroundStars() {
+            backgroundStars = [];
+            for (let i = 0; i < 150; i++) {
+                backgroundStars.push({
+                    x: Math.random() * 2000,
+                    y: Math.random() * 2000,
+                    size: Math.random() * 1.8 + 0.4,
+                    alpha: Math.random() * 0.7 + 0.3
                 });
             }
-        }
-
-        function handleSearch() {
-            const query = document.getElementById('searchInput').value.trim().toLowerCase();
-            if (!query) return;
-
-            const catalog = [
-                { id: 'Barnards-Star', name: 'Barnard\'s Star', ra: 269.452, dec: 4.693, type: 'Red Dwarf', dist: '6.0 ly', mag: '9.5', desc: 'Famous high-proper-motion star in Ophiuchus.', chem: 'Hydrogen, Helium' },
-                { id: 'Epsilon-Indi-B', name: 'Epsilon Indi Ba,Bb', ra: 330.938, dec: -56.772, type: 'Brown Dwarf Pair', dist: '11.8 ly', mag: '14.5', desc: 'Pair of brown dwarfs orbiting a star.', chem: 'Methane (CH4), Water (H2O)' },
-                { id: 'WISE-0855', name: 'WISE 0855-0714', ra: 133.795, dec: -7.245, type: 'Brown Dwarf', dist: '7.2 ly', mag: '16.1', desc: 'Fast-moving, very cold brown dwarf.', chem: 'Water (H2O) Ice, Ammonia' },
-                { id: 'RW-Aurigae', name: 'RW Aurigae', ra: 75.751, dec: 30.407, type: 'Variable Star', dist: '390 ly', mag: '10.5', desc: 'T Tauri variable star system.', chem: 'Carbon Monoxide (CO), Water (H2O)' },
-                { id: 'R-Draconis', name: 'R Draconis', ra: 248.887, dec: 66.721, type: 'Variable Star', dist: '1000 ly', mag: '7.6', desc: 'Mira-type variable star.', chem: 'Titanium Oxide (TiO), Carbon Dioxide (CO2)' },
-                { id: 'COSMOS-Field', name: 'COSMOS Deep Field', ra: 150.119, dec: 2.2058, type: 'Extragalactic', dist: '2.1 Bil ly', mag: '18.4', desc: 'Deep survey field for extragalactic research.', chem: 'Hydrogen, Helium, Carbon' }
-            ];
-
-        // Epoch date mapping
-        const epochDates = {
-            1: "1 November 2025",
-            2: "1 May 2026",
-            3: "1 November 2026",
-            4: "1 May 2027",
-            5: "1 November 2027",
-            6: "1 May 2028"
-        };
-
-            // Fuzzy matching
-            const results = catalog.map(item => {
-                let score = 0;
-                const name = item.name.toLowerCase();
-                const desc = item.desc.toLowerCase();
-                
-                if (name === query) score += 10;
-                else if (name.startsWith(query)) score += 5;
-                else if (name.includes(query)) score += 3;
-                else if (desc.includes(query)) score += 1;
-                
-                return { ...item, score };
-            }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
-
-            displayResults(results);
-        }
-
-        function displayResults(results) {
-            const container = document.getElementById('resultsList');
-            container.innerHTML = '';
-            results.forEach(obj => {
-                const card = document.createElement('div');
-                card.className = 'p-3 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer transition border border-slate-700 text-sm';
-                card.onclick = () => openDetails(obj);
-                card.innerHTML = `<div class="font-bold text-cyan-400">${obj.name}</div><div class="text-xs text-slate-400">${obj.type}</div>`;
-                container.appendChild(card);
-            });
-        }
-
-        function openDetails(obj) {
-            appState.currentTarget = obj;
-            const content = document.getElementById('panelContent');
-            if (content) {
-                content.innerHTML = `
-                    <div><strong>Name:</strong> <span class="text-cyan-400">${obj.name}</span></div>
-                    <div><strong>Type:</strong> ${obj.type}</div>
-                    <div><strong>RA:</strong> ${obj.ra}°</div>
-                    <div><strong>Dec:</strong> ${obj.dec}°</div>
-                    <div class="pt-2 text-slate-400 italic">${obj.desc}</div>
-                `;
-            }
-            const coordsLabel = document.getElementById('targetCoords');
-            if (coordsLabel) coordsLabel.innerText = `RA ${obj.ra} / DEC ${obj.dec}`;
-            
-            fetchRealData(obj.ra, obj.dec);
-            drawSky(); 
-        }
-
-        // Simple constellation lookup (based on RA/Dec ranges - simplified mapping)
-        function getConstellation(ra, dec) {
-            // Simplified approximation for demonstration
-            if (ra > 180 && ra < 210 && dec > -20 && dec < 20) return "Virgo";
-            if (ra > 260 && ra < 280 && dec > -10 && dec < 10) return "Ophiuchus";
-            if (ra > 70 && ra < 90 && dec > 10 && dec < 40) return "Auriga";
-            return "Unknown";
-        }
-
-        function plotStarAndSurroundings(target) {
-            if (!starCtx) return;
-            const w = starCanvas.width;
-            const h = starCanvas.height;
-            starCtx.clearRect(0, 0, w, h);
-
-            // Draw Background Grid
-            starCtx.strokeStyle = '#1e293b';
-            starCtx.lineWidth = 0.5;
-            for(let x=0; x<w; x+=30) {
-                starCtx.beginPath(); starCtx.moveTo(x,0); starCtx.lineTo(x,h); starCtx.stroke();
-            }
-            for(let y=0; y<h; y+=30) {
-                starCtx.beginPath(); starCtx.moveTo(0,y); starCtx.lineTo(w,y); starCtx.stroke();
-            }
-
-            const cx = w / 2;
-            const cy = h / 2;
-            const scale = 3250; // Wider field of view
-
-            // Plot Real Reference Stars (Brighter and larger)
-            appState.realData.forEach(obj => {
-                const dx = (obj.ra - target.ra) * scale;
-                const dy = (obj.dec - target.dec) * scale;
-
-                // Brighter stars: higher base opacity and size
-                const brightness = Math.max(0.6, (18 - obj.mag) / 10);
-                const size = Math.max(3.0, (15 - obj.mag) * 1.2);
-
-                starCtx.fillStyle = `rgba(200, 220, 255, ${brightness})`;
-                starCtx.beginPath();
-                starCtx.arc(cx + dx, cy - dy, size, 0, Math.PI * 2);
-                starCtx.fill();
-            });
-
-
-            // Plot Target Star Position relative to epoch
-            const epochOffset = (appState.currentEpoch - 1) * 3;
-            const tx = cx + epochOffset;
-            const ty = cy - (epochOffset * 0.5);
-
-            starCtx.shadowBlur = 10;
-            starCtx.shadowColor = '#06b6d4';
-            starCtx.fillStyle = '#06b6d4';
-            starCtx.beginPath();
-            starCtx.arc(tx, ty, 5, 0, Math.PI * 2);
-            starCtx.fill();
-            starCtx.shadowBlur = 0;
-
-            starCtx.fillStyle = '#fff';
-            starCtx.font = '10px Inter';
-            starCtx.fillText(target.name + ' (SPHEREx Target)', tx + 8, ty + 3);
-
-            starCtx.setLineDash([2, 2]);
-            starCtx.strokeStyle = '#f97316';
-            starCtx.beginPath();
-            starCtx.arc(cx, cy, 6, 0, Math.PI * 2);
-            starCtx.stroke();
-            starCtx.setLineDash([]);
-        }
-
-        // Logic for primary sky canvas (placeholder or migrated)
-        let skyCanvas, skyCtx;
-        function initCanvas() {
-            skyCanvas = document.getElementById('skyCanvas');
-            if (skyCanvas) skyCtx = skyCanvas.getContext('2d');
-            window.addEventListener('resize', drawSky);
-            drawSky();
         }
 
         function drawSky() {
-            if (!skyCtx) return;
-            const w = skyCanvas.width = skyCanvas.parentElement.clientWidth;
-            const h = skyCanvas.height = skyCanvas.parentElement.clientHeight;
-            skyCtx.fillStyle = '#05080f';
-            skyCtx.fillRect(0, 0, w, h);
-            
-            if (!appState.currentTarget) {
-                skyCtx.fillStyle = '#475569';
-                skyCtx.textAlign = 'center';
-                skyCtx.fillText('Select a target to view SPHEREx Survey data', w/2, h/2);
-            } else {
-                const target = appState.currentTarget;
-                // Survey view
-                skyCtx.strokeStyle = '#06b6d4';
-                skyCtx.lineWidth = 1;
-                skyCtx.strokeRect(w/4, h/4, w/2, h/2);
-                
-                // Detailed data display
-                skyCtx.fillStyle = '#fff';
-                skyCtx.font = 'bold 14px Inter';
-                skyCtx.textAlign = 'left';
-                skyCtx.fillText(target.name, 20, 30);
-                
-                skyCtx.font = '12px Inter';
-                skyCtx.fillStyle = '#94a3b8';
-                skyCtx.fillText('Detected Chemicals: ' + target.chem, 20, 50);
-                skyCtx.fillText('Infrared Survey (Bands 1-6): Data Active', 20, 70);
-                
-                skyCtx.fillStyle = '#06b6d4';
-                skyCtx.fillText(`Epoch ${appState.currentEpoch} (${epochDates[appState.currentEpoch]})`, 20, 90);
+            if (!ctx) return;
+            const w = canvas.width, h = canvas.height;
+            ctx.fillStyle = '#02050b';
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw deep space background star field
+            ctx.fillStyle = '#ffffff';
+            backgroundStars.forEach(star => {
+                ctx.globalAlpha = star.alpha;
+                ctx.beginPath();
+                ctx.arc(star.x % w, star.y % h, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Astrometric Grid Lines in NASA Blue tint
+            ctx.strokeStyle = 'rgba(11, 61, 145, 0.25)';
+            ctx.lineWidth = 1;
+            for(let x = 0; x < w; x += 80){ ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+            for(let y = 0; y < h; y += 80){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+            // Target reticle shift across survey epochs
+            const shift = (currentEpoch - 1) * 22;
+            const cx = w/2 + shift, cy = h/2 - (shift * 0.3);
+
+            // Outer Target Crosshair Brackets
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+
+            // NASA Red Pulsing Target Center
+            ctx.strokeStyle = '#FC3D21';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke();
+
+            // Inner crosshairs
+            ctx.strokeStyle = '#3b82f6';
+            ctx.beginPath(); ctx.moveTo(cx - 40, cy); ctx.lineTo(cx - 16, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx + 16, cy); ctx.lineTo(cx + 40, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy - 40); ctx.lineTo(cx, cy - 16); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy + 16); ctx.lineTo(cx, cy + 40); ctx.stroke();
+
+            // Target label overlay on canvas
+            ctx.fillStyle = '#38bdf8';
+            ctx.font = '10px JetBrains Mono';
+            ctx.fillText(`[TRACKING] ${currentTarget.name.toUpperCase()} (EPOCH ${currentEpoch}/6)`, cx + 20, cy - 25);
+        }
+
+        function initChart() {
+            const chartCtx = document.getElementById('spectrumChart').getContext('2d');
+            spectrumChart = new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['0.75μm', '1.0μm', '1.25μm', '1.5μm', '1.75μm', '2.0μm', '2.25μm', '2.5μm', '2.75μm', '3.0μm', '3.25μm', '3.5μm', '3.75μm', '4.0μm', '4.25μm', '4.5μm', '5.0μm'],
+                    datasets: [{
+                        label: 'Relative Flux (mJy)',
+                        data: currentTarget.flux,
+                        borderColor: '#0B3D91',
+                        backgroundColor: 'rgba(11, 61, 145, 0.25)',
+                        pointBorderColor: '#FC3D21',
+                        pointBackgroundColor: '#FC3D21',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(22,38,77,0.5)' } },
+                        y: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(22,38,77,0.5)' } }
+                    }
+                }
+            });
+        }
+
+        function selectPresetTarget(key) {
+            currentTarget = targetPresets[key];
+            updateDashboardMetrics(currentTarget);
+            triggerAIInsight(currentTarget.name, currentTarget.chem);
+        }
+
+        async function handleTargetSearch(query) {
+            if (!query.trim()) return;
+
+            document.getElementById('meta-name').innerText = query;
+            document.getElementById('aiStatus').innerText = 'RESOLVING...';
+
+            if (window.spherexAPI && window.spherexAPI.resolveObject) {
+                try {
+                    const res = await window.spherexAPI.resolveObject(query);
+                    if (res) {
+                        document.getElementById('meta-ra').innerText = res.ra || '150.119';
+                        document.getElementById('meta-dec').innerText = res.dec || '+2.205';
+                    }
+                } catch(e) { console.log('NASA Query error:', e); }
             }
+
+            let seed = query.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            let dynamicFlux = Array.from({length: 17}, (_, i) => Math.abs(Math.sin(i + seed) * 28) + 4);
+
+            currentTarget = {
+                name: query,
+                type: "Survey Target",
+                dist: `${(seed % 500) / 10} ly`,
+                chem: "IR Absorption Lines",
+                ra: (100 + (seed % 180)).toFixed(3),
+                dec: (-30 + (seed % 60)).toFixed(3),
+                flux: dynamicFlux
+            };
+
+            updateDashboardMetrics(currentTarget);
+            triggerAIInsight(query, "Infrared spectral features mapped by SPHEREx");
         }
 
-        function togglePlayTimeline() {
-            appState.isPlaying = !appState.isPlaying;
-            document.getElementById('playPauseBtn').innerHTML = appState.isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
-        }
+        function updateDashboardMetrics(target) {
+            document.getElementById('meta-name').innerText = target.name;
+            document.getElementById('meta-type').innerText = target.type;
+            document.getElementById('meta-dist').innerText = target.dist;
+            document.getElementById('meta-chem').innerText = target.chem;
+            document.getElementById('meta-ra').innerText = target.ra;
+            document.getElementById('meta-dec').innerText = target.dec;
+            document.getElementById('skyCoordLabel').innerText = `TARGET: ${target.name.toUpperCase()} | RA: ${target.ra}° | DEC: ${target.dec}°`;
 
-        function stepTimeline(dir) {
-            appState.currentEpoch = Math.max(1, Math.min(6, appState.currentEpoch + dir));
-            const dateStr = epochDates[appState.currentEpoch];
-            document.getElementById('currentDateLabel').innerText = `Epoch ${appState.currentEpoch} (${dateStr})`;
-            document.getElementById('timelineProgress').style.width = (appState.currentEpoch / 6 * 100) + '%';
-            if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+            spectrumChart.data.datasets[0].data = target.flux;
+            spectrumChart.update();
             drawSky();
         }
+
+        async function triggerAIInsight(targetName, chemInfo) {
+            const aiBox = document.getElementById('aiSummaryBox');
+            const aiStatus = document.getElementById('aiStatus');
+
+            aiStatus.innerText = 'GENERATING SUMMARY...';
+            aiStatus.className = 'text-[9px] mono text-nasared animate-pulse';
+            aiBox.innerHTML = `<p class="text-blue-400 text-xs">Analyzing 102-band infrared telemetry for ${targetName} via OpenRouter...</p>`;
+
+            if (window.spherexAPI && window.spherexAPI.callOpenRouterAPI) {
+                try {
+                    const aiResponse = await window.spherexAPI.callOpenRouterAPI({
+                        prompt: `Provide a concise 2-sentence NASA astrophysical summary for celestial target ${targetName} with chemical signature ${chemInfo}.`
+                    });
+                    aiBox.innerHTML = `<p>${aiResponse.content || aiResponse}</p>`;
+                    aiStatus.innerText = 'ONLINE';
+                    aiStatus.className = 'text-[9px] mono text-blue-400';
+                    return;
+                } catch (err) {
+                    console.log('OpenRouter bridge error:', err);
+                }
+            }
+
+            setTimeout(() => {
+                aiBox.innerHTML = `
+                    <p class="font-bold text-blue-300">${targetName}</p>
+                    <p>SPHEREx 102-band survey indicates notable flux variation across the 1.5µm–3.0µm infrared range.</p>
+                    <p class="text-nasared font-semibold">Chemical Markers: ${chemInfo}</p>
+                `;
+                aiStatus.innerText = 'STANDALONE READY';
+                aiStatus.className = 'text-[9px] mono text-slate-400';
+            }, 800);
+        }
+
+        function updateEpoch(val) {
+            currentEpoch = parseInt(val);
+            const dates = ['Jan 2025', 'Jun 2025', 'Nov 2025', 'Apr 2026', 'Sep 2026', 'Feb 2027'];
+            document.getElementById('epochLabel').innerText = `Epoch ${currentEpoch} / 6 (${dates[currentEpoch - 1]})`;
+            drawSky();
+        }
+
+        function toggleKeyModal() {
+            document.getElementById('keyModal').classList.toggle('hidden');
+        }
+
+        async function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (key && window.spherexAPI && window.spherexAPI.setOpenRouterKey) {
+                await window.spherexAPI.setOpenRouterKey(key);
+            }
+            toggleKeyModal();
+        }
     </script>
-
-
 </body>
 </html>
