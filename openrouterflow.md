@@ -6,7 +6,7 @@ Step 1: Generate a Challenge and Redirect the User
 First, you must create a cryptographically secure code_verifier (a random high-entropy string) and hash it using SHA-256 to create a code_challenge. [1] (https://openrouter.ai/docs/guides/overview/auth/oauth), [2] (https://openrouter.ai/docs/client-sdks/typescript/sdks/oauth/README)
 Once generated, redirect your user to the OpenRouter OAuth Page using the following URL structure: [1] (https://openrouter.ai/docs/guides/overview/auth/oauth)
 text
-https://openrouter.ai
+https://openrouter.ai/auth
   ?callback_url=https://myapp.com/auth/callback
   &code_challenge=YOUR_SHA256_HASHED_CHALLENGE
   &code_challenge_method=S256
@@ -65,75 +65,7 @@ bash
 Authorization: Bearer sk-or-v1-0e6f44a47a05...
 Use code with caution.
 To help give you the most accurate code snippets, what programming language or framework (e.g., React, Node.js, Python, Flutter) are you building your app with?
-Implementing the OpenRouter OAuth PKCE flow in an Electron desktop application requires capturing the callback redirection. Since desktop apps do not have a standard web URL, you have two highly reliable approaches: [1] (https://marussy.com/pkce-authentication/)
-1. Custom Protocol Handler (Deep Linking - Recommended): Register a protocol like myapp://auth-callback so the external browser automatically routes the token back into your running Electron app.
-2. Local HTTP Loopback Server: Spin up a temporary, local HTTP server (http://localhost:3000/callback) to catch the request directly. [1] (https://github.com/anomalyco/opencode/issues/7766)
-Below is the complete implementation strategy using the Deep Linking approach.
-
-1. Main Process Setup (main.js)
-
-In your main process, you need to handle deep links and securely accept the authorization code. This approach passes the code to your Renderer using ipcMain. [1] (https://dev.to/originalexe/building-my-first-desktop-app-electron-initial-impressions-4cpi)
-javascript
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
-const path = require('path');
-
-let mainWindow;
-
-// Register the custom deep-link protocol
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient('myapp', process.execPath, [path.resolve(process.argv[1])]);
-  }
-} else {
-  app.setAsDefaultProtocolClient('myapp');
-}
-
-function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // For secure IPC
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  mainWindow.loadFile('index.html');
-}
-
-// Handle the open-url event (macOS)
-app.on('open-url', (event, url) => {
-  event.preventDefault();
-  handleCallbackUrl(url);
-});
-
-// Handle the second-instance event (Windows/Linux)
-app.on('second-instance', (event, commandLine) => {
-  const url = commandLine.find((arg) => arg.startsWith('myapp://'));
-  if (url) handleCallbackUrl(url);
-});
-
-function handleCallbackUrl(urlStr) {
-  try {
-    const url = new URL(urlStr);
-    const code = url.searchParams.get('code');
-    if (code && mainWindow) {
-      // Send the code down to the UI / renderer process
-      mainWindow.webContents.send('oauth-code-received', code);
-    }
-  } catch (err) {
-    console.error('Failed to parse auth URL', err);
-  }
-}
-
-// Open external browser for auth
-ipcMain.on('open-auth-browser', (event, authUrl) => {
-  shell.openExternal(authUrl);
-});
-
-app.whenReady().then(createWindow);
-Use code with caution.
+For Electron, this app uses OpenRouter's documented localhost callback support rather than a custom URI scheme. The main process listens on `http://localhost:3000/auth/callback`, forwards the callback to the renderer over IPC, and the renderer exchanges the code using the original PKCE verifier. The authorization URL remains `https://openrouter.ai/auth`.
 
 2. Secure Preload Script (preload.js)
 
@@ -329,4 +261,3 @@ To tailor this setup, let me know:
 • Will users provide their own API keys, or will you host a backend proxy with a shared key?
 • What frontend stack (React, Vue, Vanilla JS) are you using?
 • Do you need assistance setting up streaming responses through Electron IPC?
-
