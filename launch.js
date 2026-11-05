@@ -27,7 +27,6 @@ if (nodeMajor < 24) {
 const PROJECT_DIR = __dirname;
 const ELECTRON_CLI = path.join(PROJECT_DIR, 'node_modules', 'electron', 'cli.js');
 
-
 // 2. CHECK & AUTO-FIX ELECTRON BINARY IF MISSING
 function ensureElectronInstalled() {
   let isInstalled = false;
@@ -56,7 +55,7 @@ function ensureElectronInstalled() {
 // 3. FALLBACK LIGHTWEIGHT SERVER FOR HEADLESS / BROWSER RUNS
 function startFallbackServer() {
   console.log('🌐 Starting Fallback HTTP Web Server on http://localhost:3000 ...');
-
+  
   const server = http.createServer((req, res) => {
     let filePath = path.join(PROJECT_DIR, req.url === '/' ? 'index.html' : req.url);
     if (!fs.existsSync(filePath)) {
@@ -88,7 +87,7 @@ function startFallbackServer() {
 
   server.listen(3000, () => {
     console.log('✨ SPHEREx Tool running at http://localhost:3000');
-
+    
     // Auto-open browser
     const platform = process.platform;
     let startCmd = 'open';
@@ -119,6 +118,7 @@ function launchApp() {
     console.error('⚠️ Could not launch Electron desktop UI:', err.message);
     startFallbackServer();
   });
+
   electronProcess.on('exit', (code) => {
     if (code !== 0 && code !== null) {
       console.warn(`⚠️ Electron exited with code ${code}. Falling back to Web Server...`);
@@ -129,5 +129,5 @@ function launchApp() {
   });
 }
 
-// Execute Launcher
+// Execute
 launchApp();

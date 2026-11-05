@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPHEREx Sky Survey Research Tool - NASA Time-Domain Explorer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Theme management
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        }
+
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        // Light mode defaults
+                        bg: '#f8fafc',
+                        panel: '#ffffff',
+                        text: '#1e293b',
+                        // Dark mode equivalents
+                        darkbg: '#05080f',
+                        darkpanel: '#0d1522',
+                        darktext: '#e2e8f0',
+                        accent: '#06b6d4'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b1017; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        
+        .glow-cyan { box-shadow: 0 0 15px rgba(6, 182, 212, 0.35); }
+        .glow-orange { box-shadow: 0 0 15px rgba(249, 115, 22, 0.35); }
+    </style>
+</head>
+<body class="bg-bg dark:bg-darkbg text-text dark:text-darktext h-screen w-screen overflow-hidden flex flex-col select-none">
+
+    <!-- TOP NAVIGATION BAR -->
+    <header class="h-14 bg-panel dark:bg-[#0a111c] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 z-30 shrink-0 transition-colors">
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 bg-blue-100 dark:bg-[#0b3d91]/40 border border-blue-200 dark:border-blue-500/40 px-2.5 py-1 rounded shadow-sm">
+                <span class="text-blue-600 dark:text-blue-400 font-black tracking-widest text-xs">NASA</span>
+            </div>
+            <h1 class="font-bold text-sm md:text-base tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                SPHEREx <span class="text-xs font-normal text-slate-500 dark:text-slate-400 hidden sm:inline">TIME-DOMAIN SURVEY</span>
+            </h1>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <div class="relative flex items-center">
+                <input type="text" id="searchInput" placeholder="Search targets..." 
+                    onkeyup="if(event.key === 'Enter') handleSearch()"
+                    class="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-200 px-3 py-1.5 pl-8 rounded-lg w-56 sm:w-80 focus:outline-none focus:border-cyan-500 transition shadow-inner">
+                <i class="fa-solid fa-search absolute left-2.5 text-slate-400 text-xs"></i>
+            </div>
+            <button onclick="toggleSidebar()" class="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 p-2 rounded-lg transition" title="Toggle Filters">
+                <i class="fa-solid fa-filter text-slate-600 dark:text-slate-300"></i>
+            </button>
+            <button onclick="toggleDetailsPanel()" class="bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 p-2 rounded-lg transition" title="Toggle Details">
+                <i class="fa-solid fa-circle-info text-slate-600 dark:text-slate-300"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APP LAYOUT -->
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- LEFT SIDEBAR: DATA LAYERS & FILTERS -->
+        <aside id="sidebar" class="w-64 md:w-72 bg-[#0d1522] border-r border-slate-800 flex flex-col z-20 shrink-0 transition-all duration-300">
+            <div class="p-3 bg-slate-100 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wider uppercase flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-cyan-600 dark:text-cyan-400"></i> Research Dashboard
+                </span>
+                <div class="flex gap-1">
+                    <button onclick="toggleSettings()" class="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs p-1" title="Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3">
+                <!-- Search Results -->
+                <div id="resultsList" class="flex flex-col gap-2 w-full h-auto z-50 relative block"></div>
+                
+                <!-- IRSA API Collection Picker -->
+                <div class="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/50 p-2.5 space-y-1.5">
+                    <label class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-database text-blue-400"></i> IRSA Dataset Collection
+                    </label>
+                    <select id="collectionSelect" onchange="changeCollection(this.value)" class="w-full bg-slate-950 border border-slate-700 text-xs text-cyan-300 rounded p-1.5 focus:outline-none focus:border-cyan-500">
+                        <option value="spherex_qr3">spherex_qr3 (Quick Release 3 Wide)</option>
+                        <option value="spherex_qr3_deep">spherex_qr3_deep (Deep Survey)</option>
+                        <option value="spherex_qr2">spherex_qr2 (Quick Release 2)</option>
+                    </select>
+                </div>
+
+                <!-- Accordion Filter: 6 Spectral Bands -->
+                <div class="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/50">
+                    <button onclick="toggleAccordion('filterBands')" class="w-full p-2.5 bg-slate-900 hover:bg-slate-850 flex items-center justify-between text-xs font-medium text-slate-300 transition">
+                        <span><i class="fa-solid fa-sliders text-cyan-400 mr-2"></i>Spectral Band Pass (1-6)</span>
+                        <i id="icon-filterBands" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform"></i>
+                    </button>
+                    <div id="content-filterBands" class="p-2.5 space-y-2 border-t border-slate-800/60 text-xs bg-slate-950/40">
+                        <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" checked onchange="toggleFilter('band1', this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                            <span>Band 1 (0.75 - 1.10 µm)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" checked onchange="toggleFilter('band2', this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                            <span>Band 2 (1.10 - 1.68 µm)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" checked onchange="toggleFilter('band3', this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                            <span>Band 3 (1.68 - 2.56 µm)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" checked onchange="toggleFilter('band4', this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                            <span>Band 4 (2.56 - 3.90 µm)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" checked onchange="toggleFilter('band5', this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                            <span>Band 5 (3.90 - 5.95 µm)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                            <input type="checkbox" checked onchange="toggleFilter('band6', this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                            <span>Band 6 (5.95 - 9.00 µm)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Target Catalog Selection -->
+                <div class="border border-slate-800 rounded-lg overflow-hidden bg-slate-900/50">
+                    <button onclick="toggleAccordion('targetList')" class="w-full p-2.5 bg-slate-900 hover:bg-slate-850 flex items-center justify-between text-xs font-medium text-slate-300 transition">
+                        <span><i class="fa-solid fa-crosshairs text-emerald-400 mr-2"></i>Time-Domain Targets</span>
+                        <i id="icon-targetList" class="fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform"></i>
+                    </button>
+                    <div id="content-targetList" class="p-2.5 space-y-1.5 border-t border-slate-800/60 text-xs bg-slate-950/40">
+                        <div onclick="selectPresetTarget('cosmos')" class="p-2 rounded bg-slate-900 hover:bg-slate-800 cursor-pointer transition border border-slate-800">
+                            <div class="font-bold text-cyan-400 flex justify-between">
+                                <span>COSMOS Field</span>
+                                <span class="text-[9px] text-emerald-400 bg-emerald-950 px-1 rounded">Deep SIA2</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400">RA 150.119, Dec +2.2058 • Extragalactic</div>
+                        </div>
+
+                        <div onclick="selectPresetTarget('asteroid')" class="p-2 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer transition border border-slate-800">
+                            <div class="font-bold text-orange-400 flex justify-between">
+                                <span>Asteroid 2025-PX3</span>
+                                <span class="text-[9px] text-orange-400 bg-orange-950 px-1 rounded">Moving</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400">High proper motion across Epochs 1-6</div>
+                        </div>
+
+                        <div onclick="selectPresetTarget('proto')" class="p-2 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer transition border border-slate-800">
+                            <div class="font-bold text-slate-200">SPHEREx-J053516-052327</div>
+                            <div class="text-[10px] text-slate-400">Proto-Star Nebula • Ice Absorption</div>
+                        </div>
+
+                        <div onclick="selectPresetTarget('m82')" class="p-2 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer transition border border-slate-800">
+                            <div class="font-bold text-slate-200">M82 Starburst Core</div>
+                            <div class="text-[10px] text-slate-400">RA 148.968, Dec +69.679 • PAH Emission</div>
+                        </div>
+
+                        <div onclick="selectPresetTarget('proxima')" class="p-2 rounded bg-slate-900 hover:bg-slate-850 cursor-pointer transition border border-slate-800">
+                            <div class="font-bold text-slate-200">Proxima Centauri</div>
+                            <div class="text-[10px] text-slate-400">Red Dwarf • High Proper Motion</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Motion Overlay Options -->
+                <div class="border border-slate-800 rounded-lg p-2.5 bg-slate-900/50 space-y-2 text-xs">
+                    <div class="font-semibold text-slate-300 uppercase tracking-wider text-[11px] flex items-center gap-1">
+                        <i class="fa-solid fa-arrows-spin text-cyan-400"></i> Motion & Diff Overlay
+                    </div>
+                    <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="chkMotionVectors" checked onchange="toggleMotionVectors(this.checked)" class="rounded border-slate-700 bg-slate-900 text-cyan-500">
+                        <span>Show Motion Vectors</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="chkDiffMode" onchange="toggleDiffMode(this.checked)" class="rounded border-slate-700 bg-slate-900 text-orange-500">
+                        <span>Blink Difference View</span>
+                    </label>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- CENTRAL SKY VIEW CONTAINER -->
+        <main class="flex-1 flex flex-col bg-[#05080f] relative overflow-hidden">
+
+            <!-- SKY VIEW HEADER BAR -->
+            <div class="h-11 bg-[#0b121d] border-b border-slate-800 px-4 flex items-center justify-between text-xs z-10 shrink-0 overflow-x-auto whitespace-nowrap">
+                <div class="flex items-center space-x-4">
+                    <span id="skyCoordLabel" class="font-semibold text-slate-200 mono flex items-center gap-2">
+                        <i class="fa-solid fa-location-crosshairs text-cyan-400"></i> ALL-SKY VIEW | R.A. 150.119°, Dec +02.2058°
+                    </span>
+                </div>
+                <div class="flex items-center space-x-3 text-slate-300">
+                    <div class="flex items-center space-x-1 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                        <span class="text-slate-400">Zoom:</span>
+                        <button onclick="zoomSky(-15)" class="hover:text-cyan-400 px-1 font-bold">-</button>
+                        <span id="zoomVal" class="mono text-cyan-400">125%</span>
+                        <button onclick="zoomSky(15)" class="hover:text-cyan-400 px-1 font-bold">+</button>
+                    </div>
+                    <div class="flex items-center space-x-1 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                        <span class="text-slate-400">Grid:</span>
+                        <button onclick="toggleGrid()" id="gridStateBtn" class="text-emerald-400 font-medium">On <span class="w-2 h-2 inline-block rounded-full bg-emerald-500 ml-0.5"></span></button>
+                    </div>
+                    <button onclick="resetSkyView()" class="bg-slate-900 hover:bg-slate-800 text-cyan-400 px-2 py-1 rounded border border-slate-800 font-mono text-[11px]">
+                        <i class="fa-solid fa-rotate-left"></i> Reset View
+                    </button>
+                </div>
+            </div>
+
+            <!-- INTERACTIVE CANVAS SKY AREA -->
+            <div id="skyCanvasContainer" class="flex-1 relative overflow-hidden cursor-crosshair">
+                <canvas id="skyCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+
+                <!-- TARGET HIGHLIGHT BOUNDING BOX (Hidden by default) -->
+                <div id="targetBoundingBox" class="absolute border-2 border-cyan-400/90 bg-cyan-500/10 shadow-[0_0_25px_rgba(6,182,212,0.3)] rounded pointer-events-auto transition-all duration-300 hidden"
+                    style="top: 32%; left: 42%; width: 180px; height: 150px;" onclick="openSelectedObjectPopup()">
+                    <div class="absolute -top-6 left-0 text-[10px] font-bold text-cyan-300 bg-slate-950/90 px-1.5 py-0.5 rounded border border-cyan-500/50 whitespace-nowrap">
+                        TARGET REGION: <span id="boxTargetName"></span>
+                    </div>
+                    <div id="boxMotionLabel" class="absolute -bottom-6 left-0 text-[10px] font-mono text-cyan-400 bg-slate-950/90 px-1.5 py-0.5 rounded border border-cyan-500/50 whitespace-nowrap">
+                    </div>
+                </div>
+
+                <!-- MOUSE COORD OVERLAY (Hidden by default) -->
+                <div id="coordsOverlay" class="absolute bottom-4 left-4 text-[11px] font-mono text-slate-300 bg-slate-950/90 px-3 py-1.5 rounded border border-slate-800 shadow flex items-center gap-3 hidden">
+                    <div>Scale: <span class="text-cyan-400">10 arcmin</span></div>
+                    <div>|</div>
+                    <div id="mouseCoords"></div>
+                    <div>|</div>
+                    <div id="currentEpochBadge" class="text-orange-400 font-bold"></div>
+                </div>
+            </div>
+
+            <!-- BOTTOM TIME-DOMAIN SURVEY TIMELINE (2025-2027) -->
+            <div class="h-32 bg-[#0b111a] border-t border-slate-800 px-4 py-2 flex flex-col justify-between z-20 shrink-0">
+                <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-slate-200 tracking-wide flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-cyan-400"></i> SPHEREx SURVEY TIMELINE (2025 - 2027)
+                        </span>
+                        <span class="text-slate-600">|</span>
+                        <span id="currentDateLabel" class="text-cyan-400 font-mono font-bold">Epoch 1 — Jan 15, 2025</span>
+                    </div>
+                    <div class="flex items-center space-x-3 text-slate-300">
+                        <button onclick="stepTimeline(-1)" class="hover:text-white px-2 py-1 rounded bg-slate-900 border border-slate-800 transition" title="Previous Epoch">
+                            <i class="fa-solid fa-backward-step"></i>
+                        </button>
+                        <button onclick="togglePlayTimeline()" id="playPauseBtn" class="bg-cyan-900/60 hover:bg-cyan-800 text-cyan-300 px-3 py-1 rounded border border-cyan-600 transition flex items-center gap-1 font-medium">
+                            <i class="fa-solid fa-pause"></i> <span>Pause Timeline</span>
+                        </button>
+                        <button onclick="stepTimeline(1)" class="hover:text-white px-2 py-1 rounded bg-slate-900 border border-slate-800 transition" title="Next Epoch">
+                            <i class="fa-solid fa-forward-step"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Timeline Scrubber Track with 6 Survey Epoch Nodes -->
+                <div class="relative flex items-center justify-between px-4 pt-1 pb-2">
+                    <div class="absolute left-6 right-6 h-1.5 bg-slate-800 rounded-full">
+                        <div id="timelineProgress" class="absolute top-0 left-0 h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-300" style="width: 10%;"></div>
+                    </div>
+
+                    <!-- 6 Epoch Nodes (6 Months Cadence mapping entire sky) -->
+                    <div onclick="setEpoch(1, 'Jan 15, 2025', '10%')" class="relative z-10 cursor-pointer group flex flex-col items-center">
+                        <div class="w-11 h-8 rounded border border-slate-700 bg-slate-900 overflow-hidden group-hover:border-cyan-400 transition shadow flex items-center justify-center text-[10px] font-mono text-cyan-300 font-bold">
+                            EP 1
+                        </div>
+                        <span class="text-[10px] text-slate-300 mt-1 group-hover:text-cyan-300 font-medium">Jan 2025</span>
+                        <div id="node-ep1" class="w-3 h-3 rounded-full bg-cyan-400 border-2 border-slate-950 absolute -bottom-3 shadow-lg"></div>
+                    </div>
+
+                    <div onclick="setEpoch(2, 'Jun 22, 2025', '26%')" class="relative z-10 cursor-pointer group flex flex-col items-center">
+                        <div class="w-11 h-8 rounded border border-slate-700 bg-slate-900 overflow-hidden group-hover:border-cyan-400 transition shadow flex items-center justify-center text-[10px] font-mono text-slate-300">
+                            EP 2
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 group-hover:text-cyan-300">Jun 2025</span>
+                        <div id="node-ep2" class="w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-700 absolute -bottom-3"></div>
+                    </div>
+
+                    <div onclick="setEpoch(3, 'Nov 10, 2025', '44%')" class="relative z-10 cursor-pointer group flex flex-col items-center">
+                        <div class="w-11 h-8 rounded border border-slate-700 bg-slate-900 overflow-hidden group-hover:border-cyan-400 transition shadow flex items-center justify-center text-[10px] font-mono text-slate-300">
+                            EP 3
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 group-hover:text-cyan-300">Nov 2025</span>
+                        <div id="node-ep3" class="w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-700 absolute -bottom-3"></div>
+                    </div>
+
+                    <div onclick="setEpoch(4, 'Apr 18, 2026', '62%')" class="relative z-10 cursor-pointer group flex flex-col items-center">
+                        <div class="w-11 h-8 rounded border border-slate-700 bg-slate-900 overflow-hidden group-hover:border-cyan-400 transition shadow flex items-center justify-center text-[10px] font-mono text-slate-300">
+                            EP 4
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 group-hover:text-cyan-300">Apr 2026</span>
+                        <div id="node-ep4" class="w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-700 absolute -bottom-3"></div>
+                    </div>
+
+                    <div onclick="setEpoch(5, 'Sep 05, 2026', '80%')" class="relative z-10 cursor-pointer group flex flex-col items-center">
+                        <div class="w-11 h-8 rounded border border-slate-700 bg-slate-900 overflow-hidden group-hover:border-cyan-400 transition shadow flex items-center justify-center text-[10px] font-mono text-slate-300">
+                            EP 5
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-1 group-hover:text-cyan-300">Sep 2026</span>
+                        <div id="node-ep5" class="w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-700 absolute -bottom-3"></div>
+                    </div>
+
+                    <div onclick="setEpoch(6, 'Feb 12, 2027', '98%')" class="relative z-10 cursor-pointer group flex flex-col items-center">
+                        <div class="w-11 h-8 rounded border border-orange-500/80 bg-slate-900 overflow-hidden group-hover:border-orange-400 transition shadow flex items-center justify-center text-[10px] font-mono text-orange-400 font-bold">
+                            EP 6
+                        </div>
+                        <span class="text-[10px] text-orange-400 font-bold mt-1">Feb 2027</span>
+                        <div id="node-ep6" class="w-3.5 h-3.5 rounded-full bg-orange-500 border-2 border-slate-950 absolute -bottom-3 shadow-lg"></div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- RIGHT OBJECT DETAILS PANEL -->
+        <aside id="detailsPanel" class="w-80 md:w-96 bg-[#0c1420] border-l border-slate-800 flex flex-col z-20 shrink-0 shadow-2xl transition-all duration-300">
+            <!-- Panel Header -->
+            <div class="p-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-200 truncate pr-2 flex items-center gap-1.5">
+                    <i class="fa-solid fa-satellite-dish text-cyan-400"></i> OBJECT DETAILS: <span id="panelObjTitle" class="text-cyan-400">COSMOS Deep Field</span>
+                </span>
+                <button onclick="toggleDetailsPanel()" class="text-slate-400 hover:text-slate-100 p-1"><i class="fa-solid fa-xmark text-sm"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+                <!-- Object Info Card -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-2 shadow-inner">
+                    <div class="font-semibold text-slate-300 uppercase tracking-wider text-[11px] flex justify-between">
+                        <span>Physical Properties</span>
+                        <span id="objSourceTag" class="text-emerald-400 font-mono text-[10px]">SIA2 Verified</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-slate-300">
+                        <div>Type: <span id="infoType" class="text-cyan-400 font-medium">Extragalactic Survey</span></div>
+                        <div>Mag: <span id="infoMag" class="text-cyan-400 font-medium">18.4 (3.5µm)</span></div>
+                        <div>Distance: <span id="infoDist" class="text-cyan-400 font-medium">2.1 Bil ly</span></div>
+                        <div class="truncate">RA / Dec: <span id="infoCoords" class="text-cyan-400 font-mono">150.119, +2.2058</span></div>
+                    </div>
+                </div>
+
+                <!-- Infrared Spectrum Chart Card -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-2 shadow-inner">
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-slate-300 uppercase tracking-wider text-[11px]">102-Band Spectrophotometry (0.75-5.0 µm)</span>
+                        <span class="text-cyan-400 text-[10px] font-mono">102 channels</span>
+                    </div>
+
+                    <!-- Spectrum SVG Canvas Simulation -->
+                    <div class="relative bg-slate-950/90 rounded border border-slate-800 p-2 h-44 flex flex-col justify-between">
+                        <div class="absolute top-2 right-3 flex items-center space-x-2 text-[10px] text-slate-400">
+                            <span>Flux (mJy)</span>
+                        </div>
+                        <svg class="w-full h-32 overflow-visible" viewBox="0 0 300 120">
+                            <!-- Grid lines -->
+                            <line x1="0" y1="30" x2="300" y2="30" stroke="#1e293b" stroke-dasharray="2 2" />
+                            <line x1="0" y1="60" x2="300" y2="60" stroke="#1e293b" stroke-dasharray="2 2" />
+                            <line x1="0" y1="90" x2="300" y2="90" stroke="#1e293b" stroke-dasharray="2 2" />
+
+                            <!-- Spectrum Curve -->
+                            <path id="spectrumPath" d="M 10,80 Q 40,20 70,60 T 130,40 T 190,95 T 250,50 T 290,65" fill="none" stroke="#38bdf8" stroke-width="2.5" />
+
+                            <!-- Data points -->
+                            <circle cx="70" cy="60" r="3" fill="#38bdf8" />
+                            <circle cx="130" cy="40" r="3" fill="#38bdf8" />
+                            <circle cx="190" cy="95" r="3" fill="#fb923c" />
+                            <circle cx="250" cy="50" r="3" fill="#38bdf8" />
+
+                            <!-- Labels -->
+                            <text x="55" y="22" fill="#38bdf8" font-size="9" font-family="monospace">1.1µm</text>
+                            <text x="115" y="22" fill="#38bdf8" font-size="9" font-family="monospace">2.5µm</text>
+                            <text x="175" y="22" fill="#fb923c" font-size="9" font-family="monospace">CO₂ Ice</text>
+                            <text x="235" y="22" fill="#38bdf8" font-size="9" font-family="monospace">4.8µm</text>
+
+                            <!-- Bottom molecular markers -->
+                            <text x="40" y="115" fill="#94a3b8" font-size="8">H₂O</text>
+                            <text x="100" y="115" fill="#94a3b8" font-size="8">CO₂</text>
+                            <text x="180" y="115" fill="#fb923c" font-size="8">CO</text>
+                            <text x="240" y="115" fill="#94a3b8" font-size="8">NH₃</text>
+                        </svg>
+                        <div class="flex justify-between text-[10px] text-slate-500 mono pt-1 border-t border-slate-800/80">
+                            <span>0.75µm</span>
+                            <span>1.5µm</span>
+                            <span>2.5µm</span>
+                            <span>3.5µm</span>
+                            <span>4.5µm</span>
+                            <span>5.0µm</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IRSA API Direct Access Links -->
+                <div class="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-2">
+                    <div class="font-semibold text-slate-300 uppercase tracking-wider text-[11px] flex justify-between">
+                        <span>IRSA SIA2 / TAP Metadata</span>
+                        <span class="text-cyan-400 font-mono text-[10px]">NASA IPAC</span>
+                    </div>
+                    <div class="space-y-1 font-mono text-[10px] text-slate-300 bg-slate-950 p-2 rounded border border-slate-800 overflow-x-auto">
+                        <div>SIA2 URL: <a id="sia2UrlText" href="#" target="_blank" class="text-cyan-400 hover:underline truncate block">https://irsa.ipac.caltech.edu/SIA?COLLECTION=spherex_qr3&POS=CIRCLE+150.119+2.2058+0.1</a></div>
+                        <div class="pt-1 text-slate-400">Format: multi-extension FITS / VOTable</div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="pt-1 flex gap-2">
+                    <button onclick="queryIRSAData()" class="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white font-medium py-2 rounded-lg transition text-xs flex items-center justify-center gap-1.5 shadow">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> Query IRSA FITS Data
+                    </button>
+                    <button onclick="shareTarget()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg transition text-xs" title="Share Target">
+                        <i class="fa-solid fa-share-nodes"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-panel dark:bg-darkpanel border border-slate-300 dark:border-slate-700 rounded-xl w-80 p-5 shadow-2xl space-y-4 relative">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-white">Settings</h3>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-600 dark:text-slate-400">Theme</span>
+                <button onclick="toggleTheme()" class="px-3 py-1 bg-slate-200 dark:bg-slate-800 rounded-lg hover:bg-slate-300 dark:hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-circle-half-stroke"></i> Toggle Mode
+                </button>
+            </div>
+            <button onclick="toggleSettings()" class="w-full mt-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg text-xs font-medium">Close</button>
+        </div>
+    </div>
+
+    <!-- POPUP MODAL FOR CLICKED OBJECT -->
+    <div id="objectModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-[#0d1522] border border-cyan-500/50 rounded-xl w-11/12 max-w-lg p-5 shadow-2xl space-y-4 relative">
+            <button onclick="closeObjectModal()" class="absolute top-3 right-3 text-slate-400 hover:text-white p-1 text-base">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-cyan-900/50 border border-cyan-400 flex items-center justify-center text-cyan-300">
+                    <i class="fa-solid fa-star text-lg"></i>
+                </div>
+                <div>
+                    <h3 id="modalTitle" class="text-base font-bold text-slate-100">COSMOS Deep Field Object</h3>
+                    <p id="modalSubtitle" class="text-xs text-cyan-400 font-mono">RA 150.119°, Dec +02.2058°</p>
+                </div>
+            </div>
+
+            <!-- Survey Image Viewer -->
+            <div id="surveyImageContainer" class="bg-black rounded-lg border border-slate-700 h-48 flex items-center justify-center overflow-hidden">
+                <img id="surveyImage" src="" alt="SPHEREx Survey Field" class="max-h-full object-contain hidden">
+                <div id="imagePlaceholder" class="text-xs text-slate-500 text-center p-4">
+                    <i class="fa-solid fa-satellite-dish text-2xl mb-2 block"></i>
+                    Fetching SPHEREx survey field image...
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-950/80 p-3 rounded-lg border border-slate-800">
+                <div>Type: <span id="modalType" class="text-cyan-300 font-medium">Extragalactic</span></div>
+                <div>Epoch Motion: <span id="modalMotion" class="text-orange-400 font-mono">+0.24"/yr</span></div>
+                <div>Infrared Mag: <span id="modalMag" class="text-cyan-300 font-medium">18.4 (3.5µm)</span></div>
+                <div>IRSA Collection: <span id="modalColl" class="text-cyan-300 font-mono">spherex_qr3</span></div>
+            </div>
+
+            <div class="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded border border-slate-800">
+                <span class="font-bold text-slate-100">Time-Domain Analysis:</span>
+                <p id="modalDesc" class="mt-1 text-slate-400">
+                    Multi-epoch comparison reveals shift across 6 survey passes (2025-2027). SPHEREx 102 spectral bands detect ice absorption features at 3.1µm and 4.2µm.
+                </p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeObjectModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg font-medium transition">
+                    Close
+                </button>
+                <button onclick="queryIRSAData()" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white text-xs rounded-lg font-medium transition flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-download"></i> Download FITS via SIA2
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION TOAST -->
+    <div id="toast" class="fixed bottom-16 right-6 bg-slate-900 border border-cyan-500 text-cyan-300 text-xs px-4 py-2.5 rounded-lg shadow-2xl z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-cyan-400"></i>
+        <span id="toastMsg">Action completed successfully.</span>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // Application State
+        const appState = {
+            zoom: 125,
+            gridVisible: true,
+            showMotionVectors: true,
+            diffMode: false,
+            collection: 'spherex_qr3',
+            currentEpoch: 1,
+            isPlaying: true,
+            realData: [],
+            filters: {
+                band1: true, band2: true, band3: true,
+                band4: true, band5: true, band6: true
+            },
+            currentTarget: null // Initialize as null to show empty state
+        };
+
+        // Fetch Real SPHEREx Catalog Data via TAP
+        async function fetchRealData(ra, dec) {
+            showToast(`Querying SPHEREx ${appState.collection} catalog...`);
+            
+            // Using a query structure compatible with IRSA TAP for SPHEREx metadata
+            // We use the collection parameter to focus the search
+            const query = `SELECT TOP 200 ra, dec, mag, collection FROM spherex_metadata WHERE collection='${appState.collection}' AND CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, 0.5))=1`;
+            
+            try {
+                const res = await window.spherexAPI.queryTAP({ adqlQuery: query });
+                if (res.success) {
+                    // Expecting JSON format from the TAP service
+                    const data = JSON.parse(res.data);
+                    appState.realData = data.data || data; // Handle variations in TAP JSON response
+                    drawSky();
+                    showToast(`Loaded ${appState.realData.length} SPHEREx mission objects.`);
+                }
+            } catch (err) {
+                console.error('SPHEREx catalog fetch error:', err);
+                showToast('Failed to fetch SPHEREx data, using simulation.');
+            }
+        }
+
+        // Initialize UI & Canvas on load
+        window.addEventListener('DOMContentLoaded', () => {
+            ['filterBands', 'targetList'].forEach(id => {
+                const content = document.getElementById('content-' + id);
+                if (content) content.style.maxHeight = content.scrollHeight + 'px';
+            });
+            initCanvas();
+            startTimelineLoop();
+
+            // Handle URL Parameters for Deep Linking
+            const params = new URLSearchParams(window.location.search);
+            const ra = params.get('ra');
+            const dec = params.get('dec');
+            if (ra && dec) {
+                openDetails({ name: 'URL Target', ra: parseFloat(ra), dec: parseFloat(dec), type: 'Coord Target', dist: 'N/A', mag: 'N/A', desc: 'Deep-linked target.' });
+            }
+
+            // Check if running inside Electron
+            if (window.spherexAPI && window.spherexAPI.isElectron) {
+                document.getElementById('apiStatusText').innerText = 'Electron API Bridge Active (IRSA Direct)';
+            }
+        });
+
+        // Toggle Accordion Panels
+        function toggleAccordion(id) {
+            const content = document.getElementById('content-' + id);
+            const icon = document.getElementById('icon-' + id);
+            if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+                content.style.maxHeight = '0px';
+                content.style.overflow = 'hidden';
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.maxHeight = content.scrollHeight + 'px';
+                content.style.overflow = 'visible';
+                if (icon) icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('hidden');
+        }
+
+        function toggleSettings() {
+            document.getElementById('settingsModal').classList.toggle('hidden');
+        }
+
+        function toggleDetailsPanel() {
+            document.getElementById('detailsPanel').classList.toggle('hidden');
+        }
+
+        // Sky Canvas Starfield rendering & time-domain animation
+        let canvas, ctx;
+        let panX = 0, panY = 0;
+
+        function initCanvas() {
+            canvas = document.getElementById('skyCanvas');
+            ctx = canvas.getContext('2d');
+            
+            function resize() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+                drawSky();
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            // Pan & Click interaction
+            let isDragging = false;
+            let startX, startY;
+
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.clientX - panX;
+                startY = e.clientY - panY;
+            });
+
+            window.addEventListener('mouseup', () => isDragging = false);
+
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Calculate simulated RA / Dec under cursor
+                const raCalc = (appState.currentTarget.ra + (x - canvas.width/2)*0.002).toFixed(4);
+                const decCalc = (appState.currentTarget.dec - (y - canvas.height/2)*0.002).toFixed(4);
+                document.getElementById('mouseCoords').innerText = `Cursor: R.A. ${raCalc}° Dec +${decCalc}°`;
+
+                if (isDragging) {
+                    panX = e.clientX - startX;
+                    panY = e.clientY - startY;
+                    drawSky();
+                }
+            });
+
+            canvas.addEventListener('click', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const scale = appState.zoom / 100;
+                const cx = canvas.width / 2 + panX;
+                const cy = canvas.height / 2 + panY;
+
+                let closest = null;
+                let minDist = 15; // Click radius
+
+                appState.realData.forEach(obj => {
+                    let x = ((obj.ra - appState.currentTarget.ra) * 600 * scale) + cx;
+                    let y = ((obj.dec - appState.currentTarget.dec) * -600 * scale) + cy;
+                    
+                    const dist = Math.sqrt(Math.pow(x - mouseX, 2) + Math.pow(y - mouseY, 2));
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = obj;
+                    }
+                });
+
+                if (closest) {
+                    openDetails(closest);
+                }
+            });
+
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                zoomSky(e.deltaY < 0 ? 10 : -10);
+            }, { passive: false });
+        }
+
+        function drawSky() {
+            if (!ctx) return;
+            const width = canvas.width;
+            const height = canvas.height;
+
+            // Background fill
+            ctx.fillStyle = '#05080f';
+            ctx.fillRect(0, 0, width, height);
+
+            // Empty state check
+            if (!appState.currentTarget) {
+                ctx.fillStyle = '#475569';
+                ctx.font = '14px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('Select an object from the search results to visualize the survey data.', width/2, height/2);
+                return;
+            }
+
+            const activeFilters = Object.values(appState.filters).filter(f => f).length;
+            if (activeFilters === 0) return;
+
+            const scale = appState.zoom / 100;
+            const cx = width / 2 + panX;
+            const cy = height / 2 + panY;
+
+            // Nebula Glow Background
+            let grad = ctx.createRadialGradient(cx, cy, 20 * scale, cx, cy, 240 * scale);
+            if (appState.diffMode) {
+                grad.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+                grad.addColorStop(0.5, 'rgba(59, 130, 246, 0.2)');
+            } else {
+                grad.addColorStop(0, 'rgba(14, 116, 144, 0.45)');
+                grad.addColorStop(0.4, 'rgba(59, 130, 246, 0.2)');
+            }
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw Stars
+            if (appState.realData && appState.realData.length > 0) {
+                ctx.fillStyle = '#f0f9ff';
+                appState.realData.forEach(obj => {
+                    let x = ((obj.ra - appState.currentTarget.ra) * 600 * scale) + cx;
+                    let y = ((obj.dec - appState.currentTarget.dec) * -600 * scale) + cy;
+                    let radius = Math.max(0.8, (15 - (obj.mag || 12)) * 0.15 * scale);
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            // Draw Time-Domain Moving Celestial Target
+            const epochShift = (appState.currentEpoch - 1) * 18 * scale;
+            const targetX = cx + epochShift;
+            const targetY = cy - (epochShift * 0.4);
+
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(targetX, targetY, 12 * scale, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Motion Vectors
+            if (appState.showMotionVectors) {
+                ctx.strokeStyle = '#fb923c';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.lineTo(targetX, targetY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#fb923c';
+                ctx.beginPath();
+                ctx.arc(targetX, targetY, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Coordinate Grid
+            if (appState.gridVisible) {
+                ctx.strokeStyle = 'rgba(51, 65, 85, 0.4)';
+                ctx.lineWidth = 1;
+                let stepX = (width / 8) * scale;
+                let stepY = (height / 6) * scale;
+                for (let x = panX % stepX; x < width; x += stepX) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+                for (let y = panY % stepY; y < height; y += stepY) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+            }
+
+            // Update Target Bounding Box
+            const box = document.getElementById('targetBoundingBox');
+            if (box) {
+                box.style.left = `${targetX - 90}px`;
+                box.style.top = `${targetY - 75}px`;
+                box.classList.remove('hidden');
+            }
+        }
+
+        // Timeline Loop
+        let timerId;
+        function startTimelineLoop() {
+            if (timerId) clearInterval(timerId);
+            timerId = setInterval(() => {
+                if (appState.isPlaying) {
+                    stepTimeline(1);
+                }
+            }, 2500);
+        }
+
+        function togglePlayTimeline() {
+            appState.isPlaying = !appState.isPlaying;
+            const btn = document.getElementById('playPauseBtn');
+            if (appState.isPlaying) {
+                btn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Pause Timeline</span>';
+                showToast('Timeline playback resumed.');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Play Timeline</span>';
+                showToast('Timeline playback paused.');
+            }
+        }
+
+        function stepTimeline(dir) {
+            let nextEp = appState.currentEpoch + dir;
+            if (nextEp > 6) nextEp = 1;
+            if (nextEp < 1) nextEp = 6;
+            
+            const epochDates = [
+                { date: 'Jan 15, 2025', progress: '10%' },
+                { date: 'Jun 22, 2025', progress: '26%' },
+                { date: 'Nov 10, 2025', progress: '44%' },
+                { date: 'Apr 18, 2026', progress: '62%' },
+                { date: 'Sep 05, 2026', progress: '80%' },
+                { date: 'Feb 12, 2027', progress: '98%' }
+            ];
+
+            setEpoch(nextEp, epochDates[nextEp-1].date, epochDates[nextEp-1].progress, false);
+        }
+
+        function setEpoch(epochNum, dateStr, progressWidth, showNotification = true) {
+            appState.currentEpoch = epochNum;
+            document.getElementById('currentDateLabel').innerText = `Epoch ${epochNum} — ${dateStr}`;
+            document.getElementById('timelineProgress').style.width = progressWidth;
+            document.getElementById('currentEpochBadge').innerText = `Epoch ${epochNum} (${dateStr})`;
+            
+            const shiftArcsec = ((epochNum - 1) * 0.28).toFixed(2);
+            document.getElementById('boxMotionLabel').innerText = `EPOCH ${epochNum} POSITION (Δθ = ${shiftArcsec}")`;
+
+            // Update node highlights
+            for (let i = 1; i <= 6; i++) {
+                const node = document.getElementById(`node-ep${i}`);
+                if (node) {
+                    if (i === epochNum) {
+                        node.className = 'w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 absolute -bottom-3 shadow-lg';
+                    } else {
+                        node.className = 'w-3 h-3 rounded-full bg-slate-800 border-2 border-slate-700 absolute -bottom-3';
+                    }
+                }
+            }
+
+            drawSky();
+            if (showNotification) {
+                showToast(`Loaded survey view for Epoch ${epochNum} (${dateStr})`);
+            }
+        }
+
+        // Search & API Calls
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            if (!query) return;
+
+            // Expanded SPHEREx Mission Catalog
+            const catalog = [
+                { id: 'Barnards-Star', name: 'Barnard\'s Star', ra: 269.452, dec: 4.693, type: 'Red Dwarf', dist: '6.0 ly', mag: '9.5', desc: 'Famous high-proper-motion star in Ophiuchus.' },
+                { id: 'Epsilon-Indi-B', name: 'Epsilon Indi Ba,Bb', ra: 330.938, dec: -56.772, type: 'Brown Dwarf Pair', dist: '11.8 ly', mag: '14.5', desc: 'Pair of brown dwarfs orbiting a star.' },
+                { id: 'WISE-0855', name: 'WISE 0855-0714', ra: 133.795, dec: -7.245, type: 'Brown Dwarf', dist: '7.2 ly', mag: '16.1', desc: 'Fast-moving, very cold brown dwarf.' },
+                { id: 'RW-Aurigae', name: 'RW Aurigae', ra: 75.751, dec: 30.407, type: 'Variable Star', dist: '390 ly', mag: '10.5', desc: 'T Tauri variable star system.' },
+                { id: 'R-Draconis', name: 'R Draconis', ra: 248.887, dec: 66.721, type: 'Variable Star', dist: '1000 ly', mag: '7.6', desc: 'Mira-type variable star.' },
+                { id: 'SPHEREx-J053516-052327', name: 'J053516-052327', ra: 83.822, dec: -5.391, type: 'Proto-Star', dist: '1350 ly', mag: '11.2', desc: 'Proto-Star Nebula with significant ice absorption.' },
+                { id: 'COSMOS-Field', name: 'COSMOS Deep Field', ra: 150.119, dec: 2.2058, type: 'Extragalactic', dist: '2.1 Bil ly', mag: '18.4', desc: 'Deep survey field for extragalactic research.' }
+            ];
+
+            // Calculate relevance score
+            const results = catalog.map(item => {
+                let score = 0;
+                if (item.name.toLowerCase().startsWith(query)) score += 3;
+                else if (item.name.toLowerCase().includes(query)) score += 2;
+                if (item.id.toLowerCase().includes(query)) score += 1;
+                if (item.type.toLowerCase().includes(query)) score += 1;
+                return { ...item, score };
+            }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+
+            displayResults(results);
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('resultsList');
+            container.innerHTML = '';
+
+            if (results.length === 0) {
+                container.innerHTML = '<div class="p-4 text-slate-500 text-xs text-center italic">No SPHEREx catalog matches.</div>';
+                return;
+            }
+
+            results.forEach(obj => {
+                const card = document.createElement('div');
+                card.className = 'p-3 rounded-lg bg-slate-100 dark:bg-[#0f172a] hover:bg-slate-200 dark:hover:bg-[#1e293b] cursor-pointer transition border border-slate-300 dark:border-slate-700/50 hover:border-cyan-500/50 shadow-sm mb-2';
+                card.onclick = () => openDetails(obj);
+                card.innerHTML = `
+                    <div class="font-semibold text-cyan-600 dark:text-cyan-400 text-xs mb-0.5">${obj.name}</div>
+                    <div class="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                        <span>${obj.type}</span>
+                        <span class="font-mono">${obj.dist}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            showToast(`Found ${results.length} SPHEREx matches.`);
+        }
+
+        async function openDetails(obj) {
+            appState.currentTarget = obj;
+            // Update Modal Content
+            document.getElementById('modalTitle').innerText = obj.name;
+            document.getElementById('modalSubtitle').innerText = `R.A. ${obj.ra}°, Dec +${obj.dec}°`;
+            document.getElementById('modalType').innerText = obj.type;
+            document.getElementById('modalMag').innerText = obj.mag;
+            document.getElementById('modalDesc').innerText = obj.desc;
+            
+            // Reveal map overlays
+            document.getElementById('targetBoundingBox').classList.remove('hidden');
+            document.getElementById('coordsOverlay').classList.remove('hidden');
+
+            // Trigger Image Fetch
+            document.getElementById('surveyImage').classList.add('hidden');
+            document.getElementById('imagePlaceholder').classList.remove('hidden');
+            
+            if (window.spherexAPI && window.spherexAPI.searchSIA2) {
+                const siaRes = await window.spherexAPI.searchSIA2({
+                    collection: appState.collection, ra: obj.ra, dec: obj.dec, radius: 0.05
+                });
+                if (siaRes.success && siaRes.imageUrl) {
+                    const img = document.getElementById('surveyImage');
+                    img.src = siaRes.imageUrl;
+                    img.classList.remove('hidden');
+                    document.getElementById('imagePlaceholder').classList.add('hidden');
+                }
+            }
+            
+            document.getElementById('objectModal').classList.remove('hidden');
+            drawSky();
+            fetchRealData(obj.ra, obj.dec);
+        }
+
+        function selectPresetTarget(key) {
+            const presets = {
+                'cosmos': { name: 'COSMOS Deep Field', ra: 150.119, dec: 2.2058, type: 'Extragalactic', dist: '2.1 Bil ly', mag: '18.4', desc: 'Deep survey field for extragalactic research.' },
+                'asteroid': { name: 'Asteroid 2025-PX3', ra: 150.250, dec: 2.310, type: 'Near-Earth Asteroid', dist: '0.12 AU', mag: '14.2', desc: 'Near-Earth object with high proper motion.' },
+                'proto': { name: 'SPHEREx-J053516-052327', ra: 83.822, dec: -5.391, type: 'Proto-Star', dist: '1350 ly', mag: '11.2', desc: 'Proto-Star Nebula with significant ice absorption.' },
+                'm82': { name: 'M82 Starburst Core', ra: 148.968, dec: 69.679, type: 'Starburst', dist: '11.5M ly', mag: '9.4', desc: 'Starburst core with strong PAH emissions.' },
+                'proxima': { name: 'Proxima Centauri', ra: 217.429, dec: -62.679, type: 'M Dwarf', dist: '4.2 ly', mag: '11.1', desc: 'Red Dwarf with high proper motion.' }
+            };
+
+            const t = presets[key];
+            if (t) openDetails(t);
+        }
+
+        function changeCollection(val) {
+            appState.collection = val;
+            document.getElementById('modalColl').innerText = val;
+            document.getElementById('apiStatusText').innerText = `IRSA SIA2 Connected (${val})`;
+            showToast(`Switched collection to ${val}`);
+        }
+
+        function toggleFilter(band, checked) {
+            appState.filters[band] = checked;
+            drawSky();
+            showToast(`Filter ${band} ${checked ? 'enabled' : 'disabled'}`);
+        }
+
+        function toggleMotionVectors(checked) {
+            appState.showMotionVectors = checked;
+            drawSky();
+            showToast(`Motion vectors ${checked ? 'enabled' : 'disabled'}`);
+        }
+
+        function toggleDiffMode(checked) {
+            appState.diffMode = checked;
+            drawSky();
+            showToast(`Blink Difference mode ${checked ? 'enabled' : 'disabled'}`);
+        }
+
+        function zoomSky(delta) {
+            appState.zoom = Math.max(50, Math.min(400, appState.zoom + delta));
+            document.getElementById('zoomVal').innerText = appState.zoom + '%';
+            drawSky();
+        }
+
+        function toggleGrid() {
+            appState.gridVisible = !appState.gridVisible;
+            const btn = document.getElementById('gridStateBtn');
+            btn.innerHTML = appState.gridVisible ? 'On <span class="w-2 h-2 inline-block rounded-full bg-emerald-500 ml-0.5"></span>' : 'Off <span class="w-2 h-2 inline-block rounded-full bg-slate-500 ml-0.5"></span>';
+            drawSky();
+            showToast(`Grid overlay ${appState.gridVisible ? 'enabled' : 'disabled'}`);
+        }
+
+        function resetSkyView() {
+            panX = 0; panY = 0; appState.zoom = 125;
+            document.getElementById('zoomVal').innerText = '125%';
+            drawSky();
+            showToast('Reset view and centering to target.');
+        }
+
+        // Popup Modal
+        function openSelectedObjectPopup() {
+            const t = appState.currentTarget;
+            document.getElementById('modalTitle').innerText = t.id;
+            document.getElementById('modalSubtitle').innerText = `R.A. ${t.ra}°, Dec +${t.dec}°`;
+            document.getElementById('modalType').innerText = t.type;
+            document.getElementById('modalMag').innerText = t.mag;
+            document.getElementById('modalMotion').innerText = t.motion || '+0.28"/yr';
+            document.getElementById('modalDesc').innerText = t.desc || 'Detected by SPHEREx across 6 survey epochs (2025-2027) with 102 spectral bands.';
+            document.getElementById('objectModal').classList.remove('hidden');
+        }
+
+        function closeObjectModal() {
+            document.getElementById('objectModal').classList.add('hidden');
+        }
+
+        function queryIRSAData() {
+            showToast(`Initiating SIA2 FITS stream query for ${appState.currentTarget.id}...`);
+            const url = `https://irsa.ipac.caltech.edu/SIA?COLLECTION=${appState.collection}&POS=CIRCLE+${appState.currentTarget.ra}+${appState.currentTarget.dec}+0.1`;
+            window.open(url, '_blank');
+        }
+
+        function shareTarget() {
+            const dummy = document.createElement('textarea');
+            document.body.appendChild(dummy);
+            dummy.value = `https://irsa.ipac.caltech.edu/SIA?COLLECTION=${appState.collection}&POS=CIRCLE+${appState.currentTarget.ra}+${appState.currentTarget.dec}+0.1`;
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            showToast('Target IRSA SIA2 query URL copied to clipboard!');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+
+
+
