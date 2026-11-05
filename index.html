@@ -35,6 +35,48 @@
         ::-webkit-scrollbar-thumb { background: #16264d; border-radius: 2px; }
     </style>
 </head>
+<<<<<<< HEAD
+<<<<<<< HEAD
+<body>
+    <!-- Login Modal -->
+    <div id="loginOverlay" class="fixed inset-0 bg-slate-950/90 z-[10000] flex items-center justify-center">
+        <div class="bg-slate-900 p-8 rounded-xl border border-slate-700 text-center space-y-4">
+            <h2 class="text-2xl font-bold text-white">Unlock AI Discovery</h2>
+            <p class="text-slate-400">Login with OpenRouter to enable AI-powered analysis.</p>
+            <p id="authError" class="hidden text-sm text-red-400" role="alert"></p>
+            <button id="loginBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-6 rounded-lg">Login with OpenRouter</button>
+        </div>
+    </div>
+
+    <div id="settingsOverlay" class="hidden fixed inset-0 bg-slate-950/80 z-[9000] flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="w-full max-w-md bg-slate-900 p-6 rounded-xl border border-slate-700 space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 id="settingsTitle" class="text-xl font-bold text-white">Settings</h2>
+                <button id="closeSettingsBtn" class="text-slate-400 hover:text-white px-2 py-1" aria-label="Close settings">&times;</button>
+            </div>
+            <div class="rounded-lg border border-slate-700 bg-slate-950 p-4">
+                <h3 class="font-semibold text-white">OpenRouter</h3>
+                <p id="openRouterSessionStatus" class="text-sm text-slate-400 mt-1">Checking session status...</p>
+                <p class="text-xs text-slate-500 mt-2">Logging out deletes this app's local encrypted session. You will need to authorize again to use OpenRouter.</p>
+            </div>
+            <p id="settingsError" class="hidden text-sm text-red-400" role="alert"></p>
+            <div class="flex justify-end gap-2">
+                <button id="logoutBtn" class="bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-lg">Log out</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="app">
+        <!-- LEFT PANEL: Search results (Fixed top) -->
+        <aside class="panel" id="left">
+            <div class="p-4 border-b border-slate-700 bg-slate-900">
+                <h1 class="text-lg font-bold mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-cyan-400"></i> Research Dashboard
+                </h1>
+                <div class="flex items-center gap-2 border border-slate-700 rounded-lg px-3 py-2 bg-slate-950">
+                    <i class="fa-solid fa-search text-slate-500"></i>
+                    <input type="text" id="searchInput" placeholder="Search targets..." onkeyup="if(event.key === 'Enter') handleSearch()" class="bg-transparent border-none outline-none w-full text-sm">
+=======
 <body class="bg-spacebg text-slate-200 h-screen w-screen overflow-hidden flex flex-col select-none">
 
     <!-- OFFICIAL NASA INSIGNIA TOP HEADER -->
@@ -49,6 +91,22 @@
                 <span class="text-[10px] text-blue-400 mono hidden sm:inline">SPHEREx TIME-DOMAIN EXPLORER</span>
             </div>
         </div>
+=======
+<body class="bg-spacebg text-slate-200 h-screen w-screen overflow-hidden flex flex-col select-none">
+
+    <!-- OFFICIAL NASA INSIGNIA TOP HEADER -->
+    <header class="h-12 bg-spacepanel border-b border-panelborder flex items-center justify-between px-4 shrink-0 z-30">
+        <div class="flex items-center space-x-3">
+            <div class="bg-nasablue border border-blue-400/50 px-2 py-0.5 rounded flex items-center gap-1.5 shadow-md">
+                <span class="text-white font-black text-xs tracking-widest">NASA</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-nasared"></span>
+            </div>
+            <div class="flex items-baseline space-x-2">
+                <span class="font-black text-sm tracking-widest text-white">ASTREIA</span>
+                <span class="text-[10px] text-blue-400 mono hidden sm:inline">SPHEREx TIME-DOMAIN EXPLORER</span>
+            </div>
+        </div>
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
 
         <div class="flex items-center space-x-3">
             <div class="relative">
@@ -84,6 +142,10 @@
                 <div onclick="selectPresetTarget('asteroid')" id="btn-asteroid" class="p-2 rounded bg-slate-900 hover:bg-slate-800/80 cursor-pointer transition border border-panelborder group">
                     <div class="font-bold text-xs text-slate-300 group-hover:text-nasared">Asteroid 2025-PX3</div>
                     <div class="text-[10px] text-slate-400 mono">High Proper Motion Vector</div>
+<<<<<<< HEAD
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
+=======
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
                 </div>
             </div>
 
@@ -124,6 +186,67 @@
                     <span class="text-slate-200 font-bold tracking-wider uppercase">Location Tracking & Star Comparison</span>
                     <span id="skyCoordLabel" class="text-cyan-400 font-semibold">RA 150.119 / DEC 2.2058</span>
                 </div>
+<<<<<<< HEAD
+<<<<<<< HEAD
+                <div id="starPlottingArea" class="flex-1 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
+                    <canvas id="starCanvas" class="w-full h-full"></canvas>
+                    <!-- Tooltip for star hover -->
+                    <div id="starTooltip" class="absolute pointer-events-none bg-slate-950/90 border border-cyan-500/50 text-[10px] text-white p-2 rounded shadow-2xl hidden z-[9999]"></div>
+                    <div id="backgroundCatalogStatus" class="absolute bottom-2 left-2 right-2 rounded bg-slate-950/80 px-2 py-1 text-[9px] text-slate-300 mono whitespace-pre-line pointer-events-none" role="status" aria-live="polite">Gaia DR3 sources, SPHEREx observations, and named-star references appear here when you select a target.</div>
+                </div>
+            </div>
+            
+            <div id="lowerWorkspace" class="flex-1 min-h-0 flex overflow-hidden">
+                <div class="flex-1 min-w-0 relative overflow-hidden" id="skyCanvasContainer">
+                    <canvas id="skyCanvas" class="w-full h-full block"></canvas>
+                </div>
+                <section id="chatPanel" class="w-1/2 min-w-[300px] border-l border-slate-700 bg-slate-950 flex flex-col min-h-0" aria-label="DeepSeek research chat">
+                    <div class="px-3 py-1.5 border-b border-slate-700 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <h2 class="text-xs font-semibold text-slate-100">Research Chat</h2>
+                            <p class="text-[9px] text-slate-500">DeepSeek · OpenRouter · low-cost mode</p>
+                        </div>
+                        <button id="clearChatBtn" type="button" class="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded border border-slate-700" title="Clear conversation">Clear</button>
+                    </div>
+                    <div id="chatMessages" class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" aria-live="polite">
+                        <div class="text-xs text-slate-400 leading-relaxed">Ask a question to start. This chat uses your OpenRouter session and does not receive target context yet.</div>
+                    </div>
+                    <div class="border-t border-slate-700 p-2 space-y-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <p id="chatStatus" class="text-[9px] text-slate-500 min-w-0" role="status">Checking OpenRouter session...</p>
+                            <button id="reauthorizeChatBtn" type="button" class="hidden shrink-0 text-[9px] text-cyan-400 hover:text-cyan-300 underline">Reauthorize</button>
+                        </div>
+                        <form id="chatForm" class="flex items-end gap-2">
+                            <textarea id="chatInput" rows="1" maxlength="4000" placeholder="Ask a research question..." class="flex-1 resize-y min-h-[2rem] max-h-32 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-500" aria-label="Message"></textarea>
+                            <button id="sendChatBtn" type="submit" class="shrink-0 rounded-lg bg-cyan-700 hover:bg-cyan-600 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5" aria-label="Send message" disabled><i class="fa-solid fa-paper-plane"></i></button>
+                        </form>
+                        <p class="text-[8px] text-slate-600">Responses are limited to reduce usage. Shift+Enter for a new line.</p>
+                    </div>
+                </section>
+            </div>
+            
+            <!-- FIXED TIMELINE AT CENTRAL BOTTOM -->
+            <div id="timeline" class="h-14 bg-slate-950 border-t border-slate-700 flex items-center justify-between px-4 shrink-0">
+                <button id="previousEpochBtn" onclick="stepTimeline(-1)" class="p-1.5 rounded bg-slate-800 disabled:opacity-40" aria-label="Previous SPHEREx observation" disabled><i class="fa-solid fa-backward-step"></i></button>
+                <div class="flex-1 flex flex-col items-center mx-3">
+                    <span id="currentDateLabel" class="text-cyan-400 font-mono text-xs">Waiting for SPHEREx observations</span>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full mt-1">
+                        <div id="timelineProgress" class="h-full bg-cyan-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                <button onclick="togglePlayTimeline()" id="playPauseBtn" class="p-1.5 rounded bg-cyan-900/60 disabled:opacity-40" aria-label="Play SPHEREx observations" disabled><i class="fa-solid fa-play"></i></button>
+                <button id="nextEpochBtn" onclick="stepTimeline(1)" class="p-1.5 rounded bg-slate-800 disabled:opacity-40" aria-label="Next SPHEREx observation" disabled><i class="fa-solid fa-forward-step"></i></button>
+            </div>
+        </main>
+
+        <!-- RIGHT RAIL: Navigation -->
+        <nav class="panel rail flex flex-col items-center p-2 gap-2" id="rail">
+            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Home"><i class="fa-solid fa-house"></i></button>
+            <button id="settingsBtn" class="w-full p-3 rounded-full hover:bg-slate-700" title="Settings" aria-label="Settings"><i class="fa-solid fa-gear"></i></button>
+            <div class="flex-1"></div>
+            <button class="w-full p-3 rounded-full hover:bg-slate-700" title="Theme"><i class="fa-solid fa-circle-half-stroke"></i></button>
+        </nav>
+=======
                 <div class="flex-1 relative cursor-crosshair overflow-hidden">
                     <canvas id="skyCanvas" class="absolute inset-0 w-full h-full block"></canvas>
 
@@ -138,6 +261,22 @@
                     </div>
                 </div>
 
+=======
+                <div class="flex-1 relative cursor-crosshair overflow-hidden">
+                    <canvas id="skyCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+
+                    <!-- Catalog Legend Overlay -->
+                    <div class="absolute top-3 left-3 bg-slate-950/85 border border-slate-800 backdrop-blur p-2.5 rounded text-[11px] font-sans text-slate-300 space-y-1.5 shadow-lg select-none pointer-events-none">
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span><span>Gaia DR3 stars</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 bg-amber-500"></span><span>SPHEREx observations</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 bg-yellow-400 rotate-45"></span><span>SIMBAD named stars</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 bg-purple-400 rotate-45"></span><span>Gaia DR3 galaxy candidates</span></div>
+                        <div class="flex items-center gap-2"><span class="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-b-[7px] border-b-pink-400"></span><span>Gaia DR3 quasar candidates</span></div>
+                        <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-500"></span><span>Gaia DR3 unclassified</span></div>
+                    </div>
+                </div>
+
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
                 <!-- Bottom Status Ticker Bar -->
                 <div class="h-7 bg-slate-950 border-t border-panelborder px-3 flex items-center justify-between text-[11px] mono shrink-0 text-slate-400">
                     <div class="flex items-center gap-2 truncate">
@@ -181,6 +320,10 @@
             </section>
 
         </main>
+<<<<<<< HEAD
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
+=======
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
     </div>
 
     <!-- OPENROUTER API KEY MODAL -->
@@ -201,11 +344,1210 @@
 
     <!-- SCRIPT LOGIC -->
     <script>
+<<<<<<< HEAD
+<<<<<<< HEAD
+        // --- AUTHENTICATION FLOW ---
+        let authFlowGeneration = 0;
+
+        async function initiatePKCEFlow() {
+            const array = new Uint8Array(32);
+            crypto.getRandomValues(array);
+            const codeVerifier = btoa(String.fromCharCode(...array)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            const encoder = new TextEncoder();
+            const data = encoder.encode(codeVerifier);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            localStorage.setItem('pkce_verifier', codeVerifier);
+            const callbackUrl = 'http://localhost:3000/auth/callback';
+            const authUrl = new URL('https://openrouter.ai/auth');
+            authUrl.searchParams.set('callback_url', callbackUrl);
+            authUrl.searchParams.set('code_challenge', codeChallenge);
+            authUrl.searchParams.set('code_challenge_method', 'S256');
+            authUrl.searchParams.set('key_label', 'SPHEREx Sky Tool');
+            await window.spherexAPI.openExternal(authUrl.toString());
+        }
+        
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            authFlowGeneration += 1;
+            const errorElement = document.getElementById('authError');
+            errorElement.classList.add('hidden');
+            try {
+                await initiatePKCEFlow();
+            } catch (error) {
+                errorElement.textContent = `Could not start OpenRouter login: ${error.message}`;
+                errorElement.classList.remove('hidden');
+            }
+        });
+
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const settingsError = document.getElementById('settingsError');
+        const logoutButton = document.getElementById('logoutBtn');
+
+        document.getElementById('settingsBtn').addEventListener('click', async () => {
+            settingsError.classList.add('hidden');
+            settingsOverlay.classList.remove('hidden');
+            try {
+                const authenticated = await window.spherexAPI.isAuthenticated();
+                document.getElementById('openRouterSessionStatus').textContent = authenticated
+                    ? 'Signed in to OpenRouter.'
+                    : 'Not signed in to OpenRouter.';
+                logoutButton.disabled = !authenticated;
+            } catch (error) {
+                document.getElementById('openRouterSessionStatus').textContent = 'Could not read the OpenRouter session.';
+                logoutButton.disabled = true;
+                settingsError.textContent = error.message;
+                settingsError.classList.remove('hidden');
+            }
+        });
+
+        function closeSettings() {
+            settingsOverlay.classList.add('hidden');
+        }
+
+        document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+        settingsOverlay.addEventListener('click', (event) => {
+            if (event.target === settingsOverlay) closeSettings();
+        });
+
+        logoutButton.addEventListener('click', async () => {
+            authFlowGeneration += 1;
+            settingsError.classList.add('hidden');
+            logoutButton.disabled = true;
+            try {
+                await window.spherexAPI.logout();
+                localStorage.removeItem('pkce_verifier');
+                document.getElementById('openRouterSessionStatus').textContent = 'Signed out. The local session file was deleted.';
+                appState.chatAuthenticated = false;
+                await refreshChatAuthStatus();
+                document.getElementById('loginOverlay').classList.remove('hidden');
+                closeSettings();
+            } catch (error) {
+                settingsError.textContent = `Could not delete the OpenRouter session: ${error.message}`;
+                settingsError.classList.remove('hidden');
+                logoutButton.disabled = false;
+            }
+        });
+
+        window.spherexAPI.onAuthCallback(async (url) => {
+            authFlowGeneration += 1;
+            const errorElement = document.getElementById('authError');
+            try {
+                const params = new URL(url).searchParams;
+                const authError = params.get('error');
+                if (authError) {
+                    throw new Error(`OpenRouter returned an authorization error: ${authError}`);
+                }
+                const code = params.get('code');
+                const codeVerifier = localStorage.getItem('pkce_verifier');
+                if (!code || !codeVerifier) {
+                    throw new Error('The OpenRouter callback did not include a valid authorization code.');
+                }
+
+                const sessionSaved = await window.spherexAPI.exchangeCodeForApiKey({ code, codeVerifier });
+                if (!sessionSaved) {
+                    throw new Error('OpenRouter did not confirm that the session was saved.');
+                }
+                localStorage.removeItem('pkce_verifier');
+                appState.chatAuthenticated = true;
+                document.getElementById('chatStatus').textContent = 'OpenRouter connected · DeepSeek chat ready';
+                document.getElementById('sendChatBtn').disabled = false;
+                document.getElementById('reauthorizeChatBtn').classList.add('hidden');
+                document.getElementById('loginOverlay').classList.add('hidden');
+            } catch (error) {
+                errorElement.textContent = `OpenRouter login failed: ${error.message}`;
+                errorElement.classList.remove('hidden');
+            }
+        });
+
+        // Check auth status
+        window.addEventListener('DOMContentLoaded', async () => {
+            const generation = authFlowGeneration;
+            try {
+                const authenticated = await window.spherexAPI.isAuthenticated();
+                if (generation !== authFlowGeneration) return;
+                document.getElementById('loginOverlay').classList.toggle('hidden', authenticated);
+            } catch (error) {
+                if (generation !== authFlowGeneration) return;
+                const errorElement = document.getElementById('authError');
+                errorElement.textContent = `Could not load the secure OpenRouter session: ${error.message}`;
+                errorElement.classList.remove('hidden');
+            }
+        });
+
+        // Application State
+        const appState = {
+            zoom: 125,
+            gridVisible: true,
+            showMotionVectors: true,
+            diffMode: false,
+            collection: 'spherex_qr3',
+            currentEpoch: 0,
+            isPlaying: false,
+            realData: [],
+            observationEpochs: [],
+            targetMotion: null,
+            targetMotionState: 'idle',
+            targetMotionError: '',
+            chatMessages: [],
+            chatAuthenticated: false,
+            filters: { band1: true, band2: true, band3: true, band4: true, band5: true, band6: true },
+            currentTarget: null
+=======
         const targetPresets = {
             cosmos: { name: "COSMOS Deep Field", type: "Extragalactic", dist: "2.4 Gly", chem: "Water Ice / CO2 Dip", ra: 150.119, dec: 2.205, flux: [12, 14, 18, 25, 20, 15, 10, 8, 14, 22, 28, 30, 26, 20, 18, 22, 25] },
             asteroid: { name: "Asteroid 2025-PX3", type: "Near-Earth Obj", dist: "0.02 AU", chem: "Silicate / Carbonaceous", ra: 150.250, dec: 2.310, flux: [5, 8, 12, 10, 6, 4, 9, 15, 18, 12, 8, 14, 19, 22, 17, 12, 9] }
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
+=======
+        const targetPresets = {
+            cosmos: { name: "COSMOS Deep Field", type: "Extragalactic", dist: "2.4 Gly", chem: "Water Ice / CO2 Dip", ra: 150.119, dec: 2.205, flux: [12, 14, 18, 25, 20, 15, 10, 8, 14, 22, 28, 30, 26, 20, 18, 22, 25] },
+            asteroid: { name: "Asteroid 2025-PX3", type: "Near-Earth Obj", dist: "0.02 AU", chem: "Silicate / Carbonaceous", ra: 150.250, dec: 2.310, flux: [5, 8, 12, 10, 6, 4, 9, 15, 18, 12, 8, 14, 19, 22, 17, 12, 9] }
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
         };
+        const backgroundRadiusDegrees = 1;
+        const backgroundSourceStatus = { 'Gaia DR3': 'idle', SPHEREx: 'idle', SIMBAD: 'idle' };
+        const backgroundSourceErrors = {};
+        let backgroundRequestId = 0;
+        let timelineTimer = null;
+        let chatPending = false;
 
+<<<<<<< HEAD
+        function renderChatMessages() {
+            const container = document.getElementById('chatMessages');
+            if (!container) return;
+            container.replaceChildren();
+
+            if (appState.chatMessages.length === 0) {
+                const intro = document.createElement('div');
+                intro.className = 'text-xs text-slate-400 leading-relaxed';
+                intro.textContent = 'Ask a question to start. This chat uses your OpenRouter session and does not receive target context yet.';
+                container.appendChild(intro);
+                return;
+            }
+
+            for (const message of appState.chatMessages) {
+                const bubble = document.createElement('div');
+                bubble.className = message.role === 'user'
+                    ? 'ml-5 rounded-lg bg-cyan-950/70 border border-cyan-900 px-3 py-2 text-xs text-cyan-50 whitespace-pre-wrap break-words'
+                    : 'mr-3 rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 text-xs text-slate-200 whitespace-pre-wrap break-words';
+                bubble.textContent = message.content;
+                container.appendChild(bubble);
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function refreshChatAuthStatus() {
+            const status = document.getElementById('chatStatus');
+            const sendButton = document.getElementById('sendChatBtn');
+            const generation = authFlowGeneration;
+            document.getElementById('reauthorizeChatBtn').classList.add('hidden');
+            try {
+                const authenticated = await window.spherexAPI.isAuthenticated();
+                if (generation !== authFlowGeneration) return;
+                appState.chatAuthenticated = authenticated;
+                status.textContent = appState.chatAuthenticated
+                    ? 'OpenRouter connected · DeepSeek chat ready'
+                    : 'Sign in with OpenRouter to use chat.';
+            } catch (error) {
+                if (generation !== authFlowGeneration) return;
+                appState.chatAuthenticated = false;
+                status.textContent = `OpenRouter session unavailable: ${error.message}`;
+            }
+            sendButton.disabled = chatPending || !appState.chatAuthenticated;
+        }
+
+        document.getElementById('reauthorizeChatBtn').addEventListener('click', () => {
+            document.getElementById('authError').classList.add('hidden');
+            document.getElementById('loginOverlay').classList.remove('hidden');
+        });
+
+        document.getElementById('chatForm').addEventListener('submit', async event => {
+            event.preventDefault();
+            const input = document.getElementById('chatInput');
+            const status = document.getElementById('chatStatus');
+            const sendButton = document.getElementById('sendChatBtn');
+            const content = input.value.trim();
+            if (!content || chatPending) return;
+            if (!appState.chatAuthenticated) {
+                status.textContent = 'Sign in with OpenRouter before sending a message.';
+                return;
+            }
+
+            input.value = '';
+            appState.chatMessages.push({ role: 'user', content });
+            renderChatMessages();
+            chatPending = true;
+            sendButton.disabled = true;
+            status.textContent = 'DeepSeek is responding...';
+
+            try {
+                const response = await window.spherexAPI.callOpenRouterAPI({
+                    model: 'deepseek/deepseek-chat',
+                    messages: appState.chatMessages.slice(-10),
+                    maxTokens: 700,
+                    systemPrompt: 'You are a clear, helpful research assistant. Answer accurately and concisely. If uncertain, say so.'
+                });
+                const answer = response.choices?.[0]?.message?.content;
+                const answerText = typeof answer === 'string'
+                    ? answer
+                    : Array.isArray(answer)
+                        ? answer.filter(part => part.type === 'text').map(part => part.text).join('\n')
+                        : '';
+                if (!answerText.trim()) throw new Error('DeepSeek returned an empty response.');
+                appState.chatMessages.push({ role: 'assistant', content: answerText.trim() });
+                appState.chatMessages = appState.chatMessages.slice(-12);
+                renderChatMessages();
+                status.textContent = 'OpenRouter connected · DeepSeek chat ready';
+            } catch (error) {
+                appState.chatMessages.pop();
+                input.value = content;
+                renderChatMessages();
+                const errorMessage = String(error.message || error);
+                if (errorMessage.includes('OPENROUTER_CHAT_UNAUTHORIZED')) {
+                    status.textContent = errorMessage.replace('OPENROUTER_CHAT_UNAUTHORIZED:', '').trim();
+                    document.getElementById('reauthorizeChatBtn').classList.remove('hidden');
+                } else if (errorMessage.includes('OPENROUTER_AUTH_REQUIRED')) {
+                    appState.chatAuthenticated = false;
+                    sendButton.disabled = true;
+                    status.textContent = errorMessage.replace('OPENROUTER_AUTH_REQUIRED:', '').trim();
+                    document.getElementById('reauthorizeChatBtn').classList.remove('hidden');
+                    document.getElementById('loginOverlay').classList.remove('hidden');
+                } else {
+                    status.textContent = `Chat request failed: ${errorMessage}`;
+                }
+            } finally {
+                chatPending = false;
+                sendButton.disabled = !appState.chatAuthenticated;
+                input.focus();
+            }
+        });
+
+        document.getElementById('chatInput').addEventListener('keydown', event => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                document.getElementById('chatForm').requestSubmit();
+            }
+        });
+
+        document.getElementById('clearChatBtn').addEventListener('click', () => {
+            if (chatPending) return;
+            appState.chatMessages = [];
+            renderChatMessages();
+            document.getElementById('chatStatus').textContent = appState.chatAuthenticated
+                ? 'Conversation cleared · DeepSeek chat ready'
+                : 'Sign in with OpenRouter to use chat.';
+        });
+
+        refreshChatAuthStatus();
+
+        let currentTarget = targetPresets.cosmos;
+        let currentEpoch = 1;
+        let canvas, ctx, spectrumChart;
+        let catalogPoints = [];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            canvas = document.getElementById('skyCanvas');
+            ctx = canvas.getContext('2d');
+            window.addEventListener('resize', resizeCanvas);
+            initCatalogPoints();
+            initChart();
+            resizeCanvas();
+
+            if (window.spherexAPI) {
+                document.getElementById('backendStatus').innerText = 'ELECTRON CONNECTED';
+            } else {
+                document.getElementById('backendStatus').innerText = 'STANDALONE MODE';
+            }
+        });
+
+<<<<<<< HEAD
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, character => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            })[character]);
+        }
+
+        function handleStarHover(e) {
+            if (!appState.currentTarget || !starCanvas) return;
+            const rect = starCanvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const tooltip = document.getElementById('starTooltip');
+
+            const w = starCanvas.width;
+            const h = starCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            let hoveredObj = null;
+            const scale = Math.min(w, h) / (2 * backgroundRadiusDegrees);
+
+            // Prefer a SIMBAD match when it overlaps the Gaia source for the same star.
+            if (appState.realData) {
+                for (const source of [true, false]) {
+                    for (const obj of appState.realData) {
+                        if ((obj.source === 'SIMBAD') !== source) continue;
+                        const { x: sx, y: sy } = getBackgroundPixelPosition(obj, appState.currentTarget, cx, cy, scale);
+                        const dist = Math.sqrt((mx - sx)**2 + (my - sy)**2);
+                        if (dist < 8) {
+                            hoveredObj = { ...obj, displayName: obj.name || obj.id || `Ref-${obj.ra.toFixed(3)}` };
+                            break;
+                        }
+                    }
+                    if (hoveredObj) break;
+                }
+            }
+
+            // The plotted target remains at its catalogue coordinates.
+            const trackedPosition = getTrackedTargetPosition(appState.currentTarget);
+            const { x: tx, y: ty } = getBackgroundPixelPosition(trackedPosition, appState.currentTarget, cx, cy, scale);
+            const tDist = Math.sqrt((mx - tx)**2 + (my - ty)**2);
+            if (tDist < 10) {
+                hoveredObj = { ...appState.currentTarget, displayName: appState.currentTarget.name, isTarget: true };
+            }
+
+            if (hoveredObj) {
+                tooltip.style.left = (mx + 15) + 'px';
+                tooltip.style.top = (my + 15) + 'px';
+                const constel = getConstellation(hoveredObj.ra, hoveredObj.dec);
+                const distanceDescription = getDistanceDescription(hoveredObj);
+                tooltip.innerHTML = `
+                    <div class="font-bold ${hoveredObj.isTarget ? 'text-cyan-400' : 'text-slate-300'} mb-0.5">${escapeHtml(hoveredObj.displayName)}</div>
+                    <div class="text-[10px] text-emerald-400 font-semibold mb-1 uppercase tracking-tight">${escapeHtml(hoveredObj.source || hoveredObj.type || 'Background Source')}</div>
+                    <div class="text-[9px] text-slate-200 mb-1">${distanceDescription}</div>
+                    ${hoveredObj.classification ? `<div class="text-[10px] text-amber-300 mb-1">${escapeHtml(hoveredObj.classification)}</div>` : ''}
+                    ${hoveredObj.classificationDetail ? `<div class="text-[9px] text-slate-300 mb-1">${escapeHtml(hoveredObj.classificationDetail)}</div>` : ''}
+                    ${hoveredObj.catalogId ? `<div class="text-[9px] text-slate-400 mb-1">SIMBAD ID: ${escapeHtml(hoveredObj.catalogId)}</div>` : ''}
+                    <div class="text-[9px] text-slate-300 mb-1">Constellation: ${constel}</div>
+                    <div class="grid grid-cols-2 gap-x-2 text-[9px] opacity-80 border-t border-slate-700 pt-1 mt-1">
+                        <div>RA: ${hoveredObj.ra.toFixed(4)}</div>
+                        <div>DEC: ${hoveredObj.dec.toFixed(4)}</div>
+                        ${hoveredObj.mag ? `<div class="col-span-2">Magnitude: ${hoveredObj.mag}</div>` : ''}
+                    </div>
+                    ${hoveredObj.isTarget ? '<div class="text-[8px] text-cyan-500 mt-1 uppercase font-bold text-center border-t border-cyan-500/20 pt-1">Primary Research Target</div>' : ''}
+                `;
+                tooltip.classList.remove('hidden');
+            } else {
+                tooltip.classList.add('hidden');
+            }
+        }
+
+        function resizeStarCanvas() {
+            if (starCanvas) {
+                starCanvas.width = starCanvas.parentElement.clientWidth;
+                starCanvas.height = starCanvas.parentElement.clientHeight;
+                if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+            }
+        }
+
+        // --- CORE FUNCTIONS ---
+
+        function formatLightYears(distance) {
+            if (distance >= 10000) return `${(distance / 1000).toFixed(1)} thousand light-years`;
+            if (distance >= 1000) return `${Math.round(distance).toLocaleString()} light-years`;
+            return `${distance.toFixed(distance < 100 ? 1 : 0)} light-years`;
+        }
+
+        function getDistanceDescription(obj) {
+            if (obj.source === 'Gaia DR3' && ['Galaxy', 'Quasar'].includes(obj.catalogClass)) {
+                return `Not available from Gaia parallax: this is a ${obj.catalogClass.toLowerCase()} candidate, not a stellar distance measurement.`;
+            }
+            if (Number.isFinite(obj.parallaxMas) && Number.isFinite(obj.parallaxErrorMas)
+                && obj.parallaxMas > 0 && obj.parallaxMas / obj.parallaxErrorMas >= 5) {
+                const distance = 3261.56 / obj.parallaxMas;
+                const nearerDistance = 3261.56 / (obj.parallaxMas + obj.parallaxErrorMas);
+                const fartherDistance = obj.parallaxMas > obj.parallaxErrorMas
+                    ? 3261.56 / (obj.parallaxMas - obj.parallaxErrorMas)
+                    : Infinity;
+                const lowerUncertainty = distance - nearerDistance;
+                const upperUncertainty = fartherDistance - distance;
+                const uncertainty = Math.max(lowerUncertainty, upperUncertainty);
+                return `${formatLightYears(distance)} (${obj.parallaxSource || 'Gaia DR3'} parallax; approx. ±${formatLightYears(uncertainty)})`;
+            }
+            if (obj.distanceLy > 0) return `About ${formatLightYears(obj.distanceLy)} (${obj.parallaxSource || 'Gaia DR3'} parallax)`;
+            if (obj.dist) return `${obj.dist} (target catalog value)`;
+            if (obj.isField) return 'Not applicable: this is a survey field, not a single object.';
+            if (obj.source === 'SPHEREx') return 'Not available: this is an observation footprint, not an individual celestial object.';
+            if (obj.source === 'Gaia DR3') return 'No reliable parallax distance is available for this Gaia source.';
+            return 'Distance not available in the selected catalog.';
+        }
+
+        function getBackgroundPixelPosition(obj, target, centerX, centerY, scale) {
+            const raOffset = ((obj.ra - target.ra + 540) % 360) - 180;
+            const decScale = Math.cos(target.dec * Math.PI / 180);
+            return {
+                x: centerX + raOffset * decScale * scale,
+                y: centerY - (obj.dec - target.dec) * scale
+            };
+        }
+
+        function angularSeparationDegrees(ra1, dec1, ra2, dec2) {
+            const toRadians = degrees => degrees * Math.PI / 180;
+            const dec1Radians = toRadians(dec1);
+            const dec2Radians = toRadians(dec2);
+            const deltaDec = dec2Radians - dec1Radians;
+            const deltaRa = ((toRadians(ra2 - ra1) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+            const haversine = Math.sin(deltaDec / 2) ** 2
+                + Math.cos(dec1Radians) * Math.cos(dec2Radians) * Math.sin(deltaRa / 2) ** 2;
+            return 2 * Math.asin(Math.sqrt(Math.min(1, haversine))) * 180 / Math.PI;
+        }
+
+        function getConeSearchBounds(ra, dec, radius, raColumn = 'ra') {
+            const decMin = Math.max(-90, dec - radius);
+            const decMax = Math.min(90, dec + radius);
+            const maxAbsoluteDec = Math.min(90, Math.abs(dec) + radius);
+            const cosAtFieldEdge = Math.cos(maxAbsoluteDec * Math.PI / 180);
+            const raHalfWidth = cosAtFieldEdge <= 0 ? 180 : Math.min(180, radius / cosAtFieldEdge);
+            let raCondition = '';
+            if (raHalfWidth < 180) {
+                const raMin = ra - raHalfWidth;
+                const raMax = ra + raHalfWidth;
+                if (raMin < 0) raCondition = ` AND (${raColumn} >= ${360 + raMin} OR ${raColumn} <= ${raMax})`;
+                else if (raMax >= 360) raCondition = ` AND (${raColumn} >= ${raMin} OR ${raColumn} <= ${raMax - 360})`;
+                else raCondition = ` AND ${raColumn} BETWEEN ${raMin} AND ${raMax}`;
+            }
+            return { decMin, decMax, raCondition };
+        }
+
+        function getTrackedTargetPosition(target, requestedEpoch) {
+            if (!target || !appState.targetMotion || !appState.observationEpochs.length) {
+                return target || { ra: 0, dec: 0 };
+            }
+            const epoch = requestedEpoch || appState.observationEpochs[appState.currentEpoch];
+            if (!epoch) return target;
+
+            const julianYear = 2000 + (epoch.timestamp - Date.UTC(2000, 0, 1, 12)) / (365.25 * 86400000);
+            const yearsSinceReference = julianYear - appState.targetMotion.refEpoch;
+            const declinationRadians = appState.targetMotion.dec * Math.PI / 180;
+            const cosineDeclination = Math.cos(declinationRadians);
+            const raOffsetDegrees = cosineDeclination === 0
+                ? 0
+                : appState.targetMotion.pmra * yearsSinceReference / (3600000 * cosineDeclination);
+            const decOffsetDegrees = appState.targetMotion.pmdec * yearsSinceReference / 3600000;
+            return {
+                ...target,
+                ra: (appState.targetMotion.ra + raOffsetDegrees + 360) % 360,
+                dec: Math.max(-90, Math.min(90, appState.targetMotion.dec + decOffsetDegrees))
+            };
+        }
+
+        function formatEpochDate(timestamp) {
+            return new Date(timestamp).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                timeZone: 'UTC'
+            });
+        }
+
+        function updateTimeline() {
+            const epochs = appState.observationEpochs;
+            const dateLabel = document.getElementById('currentDateLabel');
+            const progress = document.getElementById('timelineProgress');
+            const previousButton = document.getElementById('previousEpochBtn');
+            const nextButton = document.getElementById('nextEpochBtn');
+            const playButton = document.getElementById('playPauseBtn');
+            if (!dateLabel || !progress || !previousButton || !nextButton || !playButton) return;
+
+            const hasEpochs = epochs.length > 0;
+            if (!hasEpochs) {
+                dateLabel.textContent = !appState.currentTarget
+                    ? 'Waiting for SPHEREx observations'
+                    : backgroundSourceStatus.SPHEREx === 'loading'
+                        ? 'Loading SPHEREx observation dates...'
+                        : backgroundSourceStatus.SPHEREx === 'error'
+                            ? 'SPHEREx observation dates unavailable'
+                            : backgroundSourceStatus.SPHEREx === 'empty'
+                                ? 'No SPHEREx observations for this field'
+                                : 'No dated SPHEREx observations for this field';
+                progress.style.width = '0%';
+            } else {
+                const epoch = epochs[appState.currentEpoch];
+                dateLabel.textContent = `SPHEREx observation ${appState.currentEpoch + 1}/${epochs.length} · ${formatEpochDate(epoch.timestamp)}`;
+                progress.style.width = `${((appState.currentEpoch + 1) / epochs.length) * 100}%`;
+            }
+
+            previousButton.disabled = !hasEpochs || appState.currentEpoch <= 0;
+            nextButton.disabled = !hasEpochs || appState.currentEpoch >= epochs.length - 1;
+            playButton.disabled = epochs.length < 2;
+            playButton.setAttribute('aria-label', appState.isPlaying ? 'Pause SPHEREx observations' : 'Play SPHEREx observations');
+            playButton.innerHTML = appState.isPlaying
+                ? '<i class="fa-solid fa-pause"></i>'
+                : '<i class="fa-solid fa-play"></i>';
+        }
+
+        function buildObservationEpochs(observations) {
+            const epochsByDate = new Map();
+            for (const observation of observations) {
+                if (!Number.isFinite(observation.mjdStart) || !Number.isFinite(observation.mjdEnd)) continue;
+                const midpointMjd = (observation.mjdStart + observation.mjdEnd) / 2;
+                const timestamp = (midpointMjd - 40587) * 86400000;
+                if (!Number.isFinite(timestamp)) continue;
+                const date = new Date(timestamp);
+                if (Number.isNaN(date.getTime())) continue;
+                const key = date.toISOString().slice(0, 10);
+                const epoch = epochsByDate.get(key) || { timestamp, observations: 0 };
+                epoch.timestamp = Math.min(epoch.timestamp, timestamp);
+                epoch.observations += 1;
+                epochsByDate.set(key, epoch);
+            }
+            return [...epochsByDate.values()].sort((a, b) => a.timestamp - b.timestamp);
+        }
+
+        function parseGaiaResponse(responseText, center) {
+            const payload = JSON.parse(responseText);
+            if (!Array.isArray(payload.metadata) || !Array.isArray(payload.data)) {
+                throw new Error('Gaia TAP response did not contain a result table.');
+            }
+            const columnIndexes = Object.fromEntries(payload.metadata.map((column, index) => [column.name, index]));
+            const raIndex = columnIndexes.ra;
+            const decIndex = columnIndexes.dec;
+            const idIndex = columnIndexes.source_id;
+            const magnitudeIndex = columnIndexes.phot_g_mean_mag;
+            const parallaxIndex = columnIndexes.parallax;
+            const parallaxErrorIndex = columnIndexes.parallax_error;
+            const starProbabilityIndex = columnIndexes.classprob_dsc_combmod_star;
+            const galaxyProbabilityIndex = columnIndexes.classprob_dsc_combmod_galaxy;
+            const quasarProbabilityIndex = columnIndexes.classprob_dsc_combmod_quasar;
+            const temperatureIndex = columnIndexes.teff_gspphot;
+            const gravityIndex = columnIndexes.logg_gspphot;
+            if ([raIndex, decIndex, idIndex].some(index => index === undefined)) {
+                throw new Error('Gaia TAP response is missing source coordinates or IDs.');
+            }
+            const probabilityFields = [
+                ['Star', starProbabilityIndex],
+                ['Galaxy', galaxyProbabilityIndex],
+                ['Quasar', quasarProbabilityIndex]
+            ];
+            const numberAt = (row, index) => (
+                index === undefined || row[index] === null || row[index] === ''
+                    ? NaN
+                    : Number(row[index])
+            );
+            const sources = payload.data.map(row => {
+                const probabilities = probabilityFields
+                    .map(([label, index]) => ({ label, probability: numberAt(row, index) }))
+                    .filter(item => Number.isFinite(item.probability));
+                probabilities.sort((a, b) => b.probability - a.probability);
+                const mostLikelyClass = probabilities[0];
+                const classification = mostLikelyClass
+                    ? `${probabilities[0].label === 'Quasar' ? 'Quasar candidate' : probabilities[0].label} (${(probabilities[0].probability * 100).toFixed(1)}% Gaia DR3 classifier probability)`
+                    : 'Classification unavailable in Gaia DR3';
+                const catalogClass = mostLikelyClass && mostLikelyClass.probability >= 0.5
+                    ? mostLikelyClass.label
+                    : 'Unclassified';
+                const temperature = numberAt(row, temperatureIndex);
+                const gravity = numberAt(row, gravityIndex);
+                let classificationDetail = '';
+
+                if (catalogClass === 'Star' && Number.isFinite(gravity)) {
+                    if (gravity >= 4) classificationDetail = 'Likely main-sequence/dwarf star (estimated from surface gravity).';
+                    else if (gravity >= 3.5) classificationDetail = 'Likely subgiant (estimated from surface gravity).';
+                    else classificationDetail = 'Likely giant star (estimated from surface gravity).';
+                } else if (catalogClass === 'Galaxy') {
+                    classificationDetail = 'Gaia DR3 classifier candidate; this is not spectroscopic confirmation. A more specific galaxy type is not provided here.';
+                } else if (catalogClass === 'Quasar') {
+                    classificationDetail = 'Gaia DR3 quasar candidate based on classifier probabilities; this is not spectroscopic confirmation.';
+                }
+
+                if (catalogClass === 'Star' && Number.isFinite(temperature)) {
+                    classificationDetail += `${classificationDetail ? ' ' : ''}Estimated effective temperature: ${Math.round(temperature)} K.`;
+                }
+
+                return {
+                    ra: Number(row[raIndex]),
+                    dec: Number(row[decIndex]),
+                    mag: Number.isFinite(numberAt(row, magnitudeIndex)) ? numberAt(row, magnitudeIndex) : 20,
+                    type: catalogClass === 'Quasar'
+                        ? 'Quasar candidate'
+                        : catalogClass === 'Galaxy'
+                            ? 'Galaxy candidate'
+                            : catalogClass === 'Unclassified'
+                                ? 'Unclassified Gaia source'
+                                : catalogClass,
+                    catalogClass,
+                    source: 'Gaia DR3',
+                    name: String(row[idIndex]),
+                    parallaxMas: numberAt(row, parallaxIndex),
+                    parallaxErrorMas: numberAt(row, parallaxErrorIndex),
+                    classification,
+                    classificationDetail
+                };
+            }).filter(source => Number.isFinite(source.ra) && Number.isFinite(source.dec));
+            if (!center) return sources;
+            return sources.filter(source => (
+                angularSeparationDegrees(center.ra, center.dec, source.ra, source.dec) <= center.radius
+            ));
+        }
+
+        function parseSpherexResponse(responseText, center) {
+            const payload = JSON.parse(responseText);
+            const table = payload.VOTABLE?.RESOURCE_ARRAY?.[0]?.TABLE;
+            const fields = table?.FIELD_ARRAY?.map(field => field['<xmlattr>']?.name);
+            const rows = table?.DATA?.TABLEDATA;
+            if (!fields || !rows) {
+                throw new Error('SPHEREx TAP response did not contain a result table.');
+            }
+            const observations = rows.map(row => {
+                const values = Object.fromEntries(fields.map((field, index) => [field, row[index]]));
+                const numberValue = value => value === null || value === undefined || value === ''
+                    ? NaN
+                    : Number(value);
+                return {
+                    ra: numberValue(values.s_ra),
+                    dec: numberValue(values.s_dec),
+                    mjdStart: numberValue(values.t_min),
+                    mjdEnd: numberValue(values.t_max),
+                    mag: 18,
+                    type: values.obs_collection,
+                    source: 'SPHEREx',
+                    name: values.obs_id
+                };
+            }).filter(source => Number.isFinite(source.ra) && Number.isFinite(source.dec));
+            if (!center) return observations;
+            return observations.filter(observation => (
+                angularSeparationDegrees(center.ra, center.dec, observation.ra, observation.dec) <= center.radius
+            ));
+        }
+
+        function parseGaiaMotionCandidates(responseText, target) {
+            const payload = JSON.parse(responseText);
+            if (!Array.isArray(payload.metadata) || !Array.isArray(payload.data)) {
+                throw new Error('Gaia proper-motion response did not contain a result table.');
+            }
+            const columns = Object.fromEntries(payload.metadata.map((column, index) => [column.name, index]));
+            const required = ['source_id', 'ra', 'dec', 'pmra', 'pmdec', 'ref_epoch'];
+            if (required.some(column => columns[column] === undefined)) {
+                throw new Error('Gaia proper-motion response is missing required columns.');
+            }
+            const numberAt = (row, column) => {
+                const value = row[columns[column]];
+                return value === null || value === '' ? NaN : Number(value);
+            };
+            const candidates = payload.data.map(row => ({
+                sourceId: String(row[columns.source_id]),
+                ra: numberAt(row, 'ra'),
+                dec: numberAt(row, 'dec'),
+                pmra: numberAt(row, 'pmra'),
+                pmdec: numberAt(row, 'pmdec'),
+                refEpoch: numberAt(row, 'ref_epoch'),
+                parallax: columns.parallax === undefined ? NaN : numberAt(row, 'parallax'),
+                parallaxError: columns.parallax_error === undefined ? NaN : numberAt(row, 'parallax_error'),
+                starProbability: columns.classprob_dsc_combmod_star === undefined
+                    ? NaN
+                    : numberAt(row, 'classprob_dsc_combmod_star')
+            })).filter(candidate => (
+                Number.isFinite(candidate.ra)
+                && Number.isFinite(candidate.dec)
+                && Number.isFinite(candidate.pmra)
+                && Number.isFinite(candidate.pmdec)
+                && Number.isFinite(candidate.refEpoch)
+            )).map(candidate => ({
+                ...candidate,
+                separationDegrees: angularSeparationDegrees(target.ra, target.dec, candidate.ra, candidate.dec)
+            })).filter(candidate => candidate.separationDegrees <= 3 / 3600);
+
+            candidates.sort((a, b) => a.separationDegrees - b.separationDegrees);
+            const candidate = candidates.find(item => (
+                item.starProbability >= 0.5
+                || (item.parallax > 0 && item.parallaxError > 0 && item.parallax / item.parallaxError >= 5)
+            ));
+            return candidate || null;
+        }
+
+        function supportsGaiaProperMotion(target) {
+            return Boolean(target && !target.isField && /\b(star|dwarf)\b/i.test(target.type || ''));
+        }
+
+        async function loadTargetMotion(target, requestId) {
+            appState.targetMotion = null;
+            appState.targetMotionError = '';
+            if (!supportsGaiaProperMotion(target) || !window.spherexAPI?.queryGaia) {
+                appState.targetMotionState = 'unavailable';
+                return;
+            }
+
+            appState.targetMotionState = 'loading';
+            const radiusDegrees = 3 / 3600;
+            const decMin = Math.max(-90, target.dec - radiusDegrees);
+            const decMax = Math.min(90, target.dec + radiusDegrees);
+            const cosDec = Math.cos(target.dec * Math.PI / 180);
+            const raHalfWidth = cosDec <= 0 ? 180 : Math.min(180, radiusDegrees / cosDec);
+            const raMin = target.ra - raHalfWidth;
+            const raMax = target.ra + raHalfWidth;
+            let raCondition = '';
+            if (raHalfWidth < 180) {
+                if (raMin < 0) raCondition = ` AND (ra >= ${360 + raMin} OR ra <= ${raMax})`;
+                else if (raMax >= 360) raCondition = ` AND (ra >= ${raMin} OR ra <= ${raMax - 360})`;
+                else raCondition = ` AND ra BETWEEN ${raMin} AND ${raMax}`;
+            }
+            const query = `SELECT TOP 100 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, classprob_dsc_combmod_star FROM gaiadr3.gaia_source WHERE dec BETWEEN ${decMin} AND ${decMax}${raCondition} AND pmra IS NOT NULL AND pmdec IS NOT NULL`;
+
+            try {
+                const response = await window.spherexAPI.queryGaia({ adqlQuery: query });
+                if (!response.success) throw new Error(response.error || 'Gaia proper-motion query failed.');
+                const motion = parseGaiaMotionCandidates(response.data, target);
+                if (requestId !== backgroundRequestId) return;
+                appState.targetMotion = motion;
+                appState.targetMotionState = motion ? 'loaded' : 'unavailable';
+                if (appState.currentTarget) {
+                    plotStarAndSurroundings(appState.currentTarget);
+                    drawSky();
+                }
+            } catch (error) {
+                if (requestId === backgroundRequestId) {
+                    appState.targetMotionState = 'error';
+                    appState.targetMotionError = String(error.message || 'Gaia proper motion is unavailable').slice(0, 100);
+                    console.warn('Gaia target proper motion unavailable.', error);
+                    if (appState.currentTarget) drawSky();
+                }
+            }
+        }
+
+        function parseSimbadNamedStars(responseText) {
+            const lines = responseText.trim().split(/\r?\n/);
+            if (lines.length < 2) return [];
+
+            const parseCsvRow = line => {
+                const values = [];
+                let value = '';
+                let quoted = false;
+                for (let index = 0; index < line.length; index += 1) {
+                    const character = line[index];
+                    if (character === '"') {
+                        if (quoted && line[index + 1] === '"') {
+                            value += '"';
+                            index += 1;
+                        } else {
+                            quoted = !quoted;
+                        }
+                    } else if (character === ',' && !quoted) {
+                        values.push(value);
+                        value = '';
+                    } else {
+                        value += character;
+                    }
+                }
+                values.push(value);
+                return values;
+            };
+
+            const fields = parseCsvRow(lines[0]).map(field => field.trim().toLowerCase());
+            const indexOf = field => fields.indexOf(field);
+            const indexes = {
+                oid: indexOf('oid'),
+                mainId: indexOf('main_id'),
+                identifier: indexOf('id'),
+                ra: indexOf('ra'),
+                dec: indexOf('dec'),
+                parallax: indexOf('plx_value'),
+                parallaxError: indexOf('plx_err'),
+                spectralType: indexOf('sp_type')
+            };
+            if ([indexes.oid, indexes.mainId, indexes.identifier, indexes.ra, indexes.dec].some(index => index < 0)) {
+                throw new Error('SIMBAD TAP response is missing named-star fields.');
+            }
+
+            const numberAt = (row, index) => {
+                if (index < 0 || !row[index]) return NaN;
+                const value = Number(row[index]);
+                return Number.isFinite(value) ? value : NaN;
+            };
+            const starsById = new Map();
+            for (const line of lines.slice(1)) {
+                const row = parseCsvRow(line);
+                const identifier = row[indexes.identifier]?.trim();
+                if (!identifier || !/^NAME\s+/i.test(identifier)) continue;
+
+                const oid = row[indexes.oid];
+                const ra = numberAt(row, indexes.ra);
+                const dec = numberAt(row, indexes.dec);
+                if (!oid || !Number.isFinite(ra) || !Number.isFinite(dec)) continue;
+
+                const star = starsById.get(oid) || {
+                    ra,
+                    dec,
+                    name: identifier.replace(/^NAME\s+/i, ''),
+                    catalogId: row[indexes.mainId],
+                    mag: 4,
+                    type: 'Named star',
+                    classification: row[indexes.spectralType] || 'Spectral type unavailable in SIMBAD',
+                    source: 'SIMBAD',
+                    parallaxMas: numberAt(row, indexes.parallax),
+                    parallaxErrorMas: numberAt(row, indexes.parallaxError),
+                    parallaxSource: 'SIMBAD'
+                };
+                starsById.set(oid, star);
+            }
+            return [...starsById.values()];
+        }
+
+        function updateBackgroundCatalogStatus() {
+            const statusElement = document.getElementById('backgroundCatalogStatus');
+            if (!statusElement) return;
+
+            const gaiaSources = appState.realData.filter(source => source.source === 'Gaia DR3');
+            const spherexSources = appState.realData.filter(source => source.source === 'SPHEREx');
+            const simbadSources = appState.realData.filter(source => source.source === 'SIMBAD');
+            const gaiaStars = gaiaSources.filter(source => source.catalogClass === 'Star').length;
+            const gaiaGalaxies = gaiaSources.filter(source => source.catalogClass === 'Galaxy').length;
+            const gaiaQuasars = gaiaSources.filter(source => source.catalogClass === 'Quasar').length;
+            const sourceLabel = (name, count, state, itemLabel) => {
+                if (state === 'loading') return `${name}: loading...`;
+                if (state === 'error') {
+                    const detail = backgroundSourceErrors[name];
+                    return `${name}: unavailable${detail ? ` (${detail})` : ''}`;
+                }
+                if (state === 'empty') return `${name}: no ${itemLabel} within ${backgroundRadiusDegrees}°`;
+                if (state === 'loaded' && name === 'Gaia DR3') {
+                    const unclassified = gaiaSources.length - gaiaStars - gaiaGalaxies - gaiaQuasars;
+                    return `${name}: ${gaiaSources.length} real sources (${gaiaStars} stars, ${gaiaGalaxies} galaxy candidates, ${gaiaQuasars} quasar candidates, ${unclassified} unclassified)`;
+                }
+                if (state === 'loaded' && name === 'SIMBAD') return `${name}: ${count} named stars`;
+                if (state === 'loaded') return `${name}: ${count} ${itemLabel}`;
+                return `${name}: waiting`;
+            };
+            const lines = [
+                `${sourceLabel('Gaia DR3', gaiaSources.length, backgroundSourceStatus['Gaia DR3'], 'sources')} · ${sourceLabel('SPHEREx', spherexSources.length, backgroundSourceStatus.SPHEREx, 'observations')}`,
+                `${sourceLabel('SIMBAD', simbadSources.length, backgroundSourceStatus.SIMBAD, 'named stars')} · SPHEREx dated epochs: ${appState.observationEpochs.length}`
+            ];
+            if (spherexSources.length) {
+                const ids = spherexSources.slice(0, 4).map(source => source.name);
+                lines.push(`SPHEREx IDs: ${ids.join(', ')}${spherexSources.length > ids.length ? ` +${spherexSources.length - ids.length} more` : ''}`);
+            }
+            statusElement.textContent = lines.join('\n');
+        }
+
+        function mergeBackgroundSources(sources, requestId) {
+            if (requestId !== backgroundRequestId || sources.length === 0) return;
+            const knownSources = new Set(appState.realData.map(source => `${source.source}:${source.name}`));
+            for (const source of sources) {
+                const key = `${source.source}:${source.name}`;
+                if (!knownSources.has(key)) {
+                    appState.realData.push(source);
+                    knownSources.add(key);
+                }
+            }
+            updateBackgroundCatalogStatus();
+            if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+            console.log(`Loaded ${sources.length} ${sources[0].source} background objects.`);
+        }
+
+        async function loadBackgroundCatalog(source, query, parser, requestId, queryFunction, center) {
+            try {
+                const response = await queryFunction({ adqlQuery: query });
+                if (!response.success) throw new Error(response.error || `${source} TAP query failed.`);
+                const sources = parser(response.data, center);
+                if (requestId !== backgroundRequestId) return;
+                if (source === 'SPHEREx') {
+                    appState.observationEpochs = buildObservationEpochs(sources);
+                    appState.currentEpoch = 0;
+                    updateTimeline();
+                }
+                delete backgroundSourceErrors[source];
+                backgroundSourceStatus[source] = sources.length ? 'loaded' : 'empty';
+                mergeBackgroundSources(sources, requestId);
+                updateBackgroundCatalogStatus();
+                if (appState.currentTarget) {
+                    plotStarAndSurroundings(appState.currentTarget);
+                    drawSky();
+                }
+            } catch (error) {
+                if (requestId === backgroundRequestId) {
+                    backgroundSourceStatus[source] = 'error';
+                    backgroundSourceErrors[source] = String(error.message || 'request failed').slice(0, 100);
+                    updateBackgroundCatalogStatus();
+                    if (source === 'SPHEREx') {
+                        appState.observationEpochs = [];
+                        appState.currentEpoch = 0;
+                        updateTimeline();
+                        if (appState.currentTarget) drawSky();
+                    }
+                }
+                console.warn(`${source} background data unavailable.`, error);
+            }
+        }
+
+        function fetchRealData(ra, dec, requestId) {
+            if (!window.spherexAPI) return;
+
+            backgroundSourceStatus['Gaia DR3'] = 'loading';
+            backgroundSourceStatus.SPHEREx = 'loading';
+            backgroundSourceStatus.SIMBAD = 'loading';
+            delete backgroundSourceErrors['Gaia DR3'];
+            delete backgroundSourceErrors.SPHEREx;
+            delete backgroundSourceErrors.SIMBAD;
+            updateBackgroundCatalogStatus();
+            updateTimeline();
+            const radius = backgroundRadiusDegrees;
+            const spherexBounds = getConeSearchBounds(ra, dec, radius, 's_ra');
+            const gaiaBounds = getConeSearchBounds(ra, dec, radius);
+            const spherexQuery = `SELECT TOP 20 s_ra, s_dec, obs_id, obs_collection, t_min, t_max FROM spherex.obscore WHERE s_dec BETWEEN ${spherexBounds.decMin} AND ${spherexBounds.decMax}${spherexBounds.raCondition}`;
+            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, parallax, parallax_error, phot_g_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} ORDER BY random_index`;
+            const simbadQuery = `SELECT TOP 500 b.oid, b.main_id, i.id, b.ra, b.dec, b.plx_value, b.plx_err, b.sp_type FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE 1=CONTAINS(POINT('ICRS', b.ra, b.dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radius})) AND b.sp_type IS NOT NULL AND i.id LIKE 'NAME %'`;
+
+            loadBackgroundCatalog('SPHEREx', spherexQuery, parseSpherexResponse, requestId, window.spherexAPI.queryTAP, { ra, dec, radius });
+            loadBackgroundCatalog('Gaia DR3', gaiaQuery, parseGaiaResponse, requestId, window.spherexAPI.queryGaia, { ra, dec, radius });
+            loadBackgroundCatalog('SIMBAD', simbadQuery, parseSimbadNamedStars, requestId, window.spherexAPI.querySimbadNamedStars);
+            loadTargetMotion(appState.currentTarget, requestId);
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim().toLowerCase();
+            if (!query) return;
+
+            const catalog = [
+                { id: 'Barnards-Star', name: 'Barnard\'s Star', ra: 269.452, dec: 4.693, type: 'Red Dwarf', dist: '6.0 ly', mag: '9.5', desc: 'Famous high-proper-motion star in Ophiuchus.', chem: 'Hydrogen, Helium' },
+                { id: 'Epsilon-Indi-B', name: 'Epsilon Indi Ba,Bb', ra: 330.938, dec: -56.772, type: 'Brown Dwarf Pair', dist: '11.8 ly', mag: '14.5', desc: 'Pair of brown dwarfs orbiting a star.', chem: 'Methane (CH4), Water (H2O)' },
+                { id: 'WISE-0855', name: 'WISE 0855-0714', ra: 133.795, dec: -7.245, type: 'Brown Dwarf', dist: '7.2 ly', mag: '16.1', desc: 'Fast-moving, very cold brown dwarf.', chem: 'Water (H2O) Ice, Ammonia' },
+                { id: 'RW-Aurigae', name: 'RW Aurigae', ra: 75.751, dec: 30.407, type: 'Variable Star', dist: '390 ly', mag: '10.5', desc: 'T Tauri variable star system.', chem: 'Carbon Monoxide (CO), Water (H2O)' },
+                { id: 'R-Draconis', name: 'R Draconis', ra: 248.887, dec: 66.721, type: 'Variable Star', dist: '1000 ly', mag: '7.6', desc: 'Mira-type variable star.', chem: 'Titanium Oxide (TiO), Carbon Dioxide (CO2)' },
+                { id: 'COSMOS-Field', name: 'COSMOS Deep Field', ra: 150.119, dec: 2.2058, type: 'Extragalactic survey field', isField: true, mag: '18.4', desc: 'Deep survey field for extragalactic research.', chem: 'Hydrogen, Helium, Carbon' }
+            ];
+
+            // Fuzzy matching
+            const results = catalog.map(item => {
+                let score = 0;
+                const name = item.name.toLowerCase();
+                const desc = item.desc.toLowerCase();
+                
+                if (name === query) score += 10;
+                else if (name.startsWith(query)) score += 5;
+                else if (name.includes(query)) score += 3;
+                else if (desc.includes(query)) score += 1;
+                
+                return { ...item, score };
+            }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
+
+            displayResults(results);
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('resultsList');
+            container.innerHTML = '';
+            results.forEach(obj => {
+                const card = document.createElement('div');
+                card.className = 'p-3 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer transition border border-slate-700 text-sm';
+                card.onclick = () => openDetails(obj);
+                card.innerHTML = `<div class="font-bold text-cyan-400">${obj.name}</div><div class="text-xs text-slate-400">${obj.type}</div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function openDetails(obj) {
+            appState.currentTarget = obj;
+            const content = document.getElementById('panelContent');
+            if (content) {
+                content.innerHTML = `
+                    <div><strong>Name:</strong> <span class="text-cyan-400">${obj.name}</span></div>
+                    <div><strong>Type:</strong> ${obj.type}</div>
+                    <div><strong>RA:</strong> ${obj.ra}°</div>
+                    <div><strong>Dec:</strong> ${obj.dec}°</div>
+                    <div><strong>Distance:</strong> ${getDistanceDescription(obj)}</div>
+                    <div class="pt-2 text-slate-400 italic">${obj.desc}</div>
+                `;
+            }
+            const coordsLabel = document.getElementById('targetCoords');
+            if (coordsLabel) coordsLabel.innerText = `RA ${obj.ra} / DEC ${obj.dec}`;
+            
+            const requestId = ++backgroundRequestId;
+            if (timelineTimer) {
+                clearInterval(timelineTimer);
+                timelineTimer = null;
+            }
+            appState.isPlaying = false;
+            appState.observationEpochs = [];
+            appState.currentEpoch = 0;
+            appState.targetMotion = null;
+            appState.targetMotionState = 'idle';
+            appState.targetMotionError = '';
+            backgroundSourceStatus['Gaia DR3'] = 'idle';
+            backgroundSourceStatus.SPHEREx = 'idle';
+            backgroundSourceStatus.SIMBAD = 'idle';
+            delete backgroundSourceErrors['Gaia DR3'];
+            delete backgroundSourceErrors.SPHEREx;
+            delete backgroundSourceErrors.SIMBAD;
+            appState.realData = [];
+            updateBackgroundCatalogStatus();
+            updateTimeline();
+            plotStarAndSurroundings(obj);
+            fetchRealData(obj.ra, obj.dec, requestId);
+            drawSky(); 
+        }
+
+        // Simple constellation lookup (based on RA/Dec ranges - simplified mapping)
+        function getConstellation(ra, dec) {
+            // Simplified approximation for demonstration
+            if (ra > 180 && ra < 210 && dec > -20 && dec < 20) return "Virgo";
+            if (ra > 260 && ra < 280 && dec > -10 && dec < 10) return "Ophiuchus";
+            if (ra > 70 && ra < 90 && dec > 10 && dec < 40) return "Auriga";
+            return "Unknown";
+        }
+
+        function plotStarAndSurroundings(target) {
+            if (!starCtx) return;
+            const w = starCanvas.width;
+            const h = starCanvas.height;
+            starCtx.clearRect(0, 0, w, h);
+
+            // Draw Background Grid
+            starCtx.strokeStyle = '#1e293b';
+            starCtx.lineWidth = 0.5;
+            for(let x=0; x<w; x+=30) {
+                starCtx.beginPath(); starCtx.moveTo(x,0); starCtx.lineTo(x,h); starCtx.stroke();
+            }
+            for(let y=0; y<h; y+=30) {
+                starCtx.beginPath(); starCtx.moveTo(0,y); starCtx.lineTo(w,y); starCtx.stroke();
+            }
+
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = Math.min(w, h) / (2 * backgroundRadiusDegrees);
+
+            // Plot catalogue sources using their Gaia DR3 classification.
+            appState.realData.forEach(obj => {
+                const { x, y } = getBackgroundPixelPosition(obj, target, cx, cy, scale);
+                const magnitude = Number.isFinite(Number(obj.mag)) ? Number(obj.mag) : 18;
+                const size = obj.source === 'Gaia DR3'
+                    ? Math.max(1.2, Math.min(3.2, 4 - (magnitude - 12) * 0.2))
+                    : 3;
+
+                if (obj.source === 'SPHEREx') {
+                    starCtx.fillStyle = '#fb923c';
+                    starCtx.fillRect(x - size, y - size, size * 2, size * 2);
+                } else if (obj.source === 'SIMBAD') {
+                    starCtx.fillStyle = '#facc15';
+                    starCtx.beginPath();
+                    starCtx.moveTo(x - size - 2, y - size);
+                    starCtx.lineTo(x + size + 2, y - size);
+                    starCtx.lineTo(x + size + 1, y + size);
+                    starCtx.lineTo(x - size - 1, y + size);
+                    starCtx.closePath();
+                    starCtx.fill();
+                    starCtx.fillStyle = '#fde68a';
+                    starCtx.font = '9px Inter';
+                    starCtx.textAlign = 'left';
+                    starCtx.fillText(obj.name, x + size + 4, y - size - 2);
+                } else if (obj.catalogClass === 'Galaxy') {
+                    starCtx.fillStyle = '#c084fc';
+                    starCtx.beginPath();
+                    starCtx.moveTo(x, y - size - 1);
+                    starCtx.lineTo(x + size + 1, y);
+                    starCtx.lineTo(x, y + size + 1);
+                    starCtx.lineTo(x - size - 1, y);
+                    starCtx.closePath();
+                    starCtx.fill();
+                } else if (obj.catalogClass === 'Quasar') {
+                    starCtx.fillStyle = '#f472b6';
+                    starCtx.beginPath();
+                    starCtx.moveTo(x, y - size - 1);
+                    starCtx.lineTo(x + size + 1, y + size);
+                    starCtx.lineTo(x - size - 1, y + size);
+                    starCtx.closePath();
+                    starCtx.fill();
+                } else {
+                    const opacity = Math.max(0.25, Math.min(0.9, 1.1 - (magnitude - 12) * 0.06));
+                    starCtx.fillStyle = obj.catalogClass === 'Star'
+                        ? `rgba(200, 220, 255, ${opacity})`
+                        : `rgba(148, 163, 184, ${opacity})`;
+                    starCtx.beginPath();
+                    starCtx.arc(x, y, size, 0, Math.PI * 2);
+                    starCtx.fill();
+                }
+            });
+
+            starCtx.font = '10px Inter';
+            starCtx.textAlign = 'left';
+            starCtx.fillStyle = '#c8dcff';
+            starCtx.beginPath();
+            starCtx.arc(15, 14, 3, 0, Math.PI * 2);
+            starCtx.fill();
+            starCtx.fillStyle = '#cbd5e1';
+            starCtx.fillText('Gaia DR3 stars', 24, 18);
+            starCtx.fillStyle = '#fb923c';
+            starCtx.fillRect(12, 26, 7, 7);
+            starCtx.fillStyle = '#cbd5e1';
+            starCtx.fillText('SPHEREx observations', 24, 33);
+            starCtx.fillStyle = '#facc15';
+            starCtx.beginPath();
+            starCtx.moveTo(12, 37);
+            starCtx.lineTo(18, 37);
+            starCtx.lineTo(17, 43);
+            starCtx.lineTo(13, 43);
+            starCtx.closePath();
+            starCtx.fill();
+            starCtx.fillStyle = '#cbd5e1';
+            starCtx.fillText('SIMBAD named stars', 24, 43);
+            starCtx.fillStyle = '#c084fc';
+            starCtx.beginPath();
+            starCtx.moveTo(15, 49);
+            starCtx.lineTo(20, 54);
+            starCtx.lineTo(15, 59);
+            starCtx.lineTo(10, 54);
+            starCtx.closePath();
+            starCtx.fill();
+            starCtx.fillStyle = '#cbd5e1';
+            starCtx.fillText('Gaia DR3 galaxy candidates', 24, 57);
+            starCtx.fillStyle = '#f472b6';
+            starCtx.beginPath();
+            starCtx.moveTo(15, 63);
+            starCtx.lineTo(20, 72);
+            starCtx.lineTo(10, 72);
+            starCtx.closePath();
+            starCtx.fill();
+            starCtx.fillStyle = '#cbd5e1';
+            starCtx.fillText('Gaia DR3 quasar candidates', 24, 71);
+            starCtx.fillStyle = '#94a3b8';
+            starCtx.beginPath();
+            starCtx.arc(15, 82, 3, 0, Math.PI * 2);
+            starCtx.fill();
+            starCtx.fillStyle = '#cbd5e1';
+            starCtx.fillText('Gaia DR3 unclassified', 24, 86);
+
+            const trackedPosition = getTrackedTargetPosition(target);
+            const { x: tx, y: ty } = getBackgroundPixelPosition(trackedPosition, target, cx, cy, scale);
+
+            starCtx.strokeStyle = '#22d3ee';
+            starCtx.lineWidth = 1;
+            starCtx.beginPath();
+            starCtx.moveTo(cx, cy);
+            starCtx.lineTo(tx, ty);
+            starCtx.stroke();
+            starCtx.strokeStyle = 'rgba(34, 211, 238, 0.45)';
+            starCtx.beginPath();
+            starCtx.arc(cx, cy, 7, 0, Math.PI * 2);
+            starCtx.stroke();
+
+            starCtx.shadowBlur = 10;
+            starCtx.shadowColor = '#06b6d4';
+            starCtx.fillStyle = '#06b6d4';
+            starCtx.beginPath();
+            starCtx.arc(tx, ty, 5, 0, Math.PI * 2);
+            starCtx.fill();
+            starCtx.shadowBlur = 0;
+
+            starCtx.fillStyle = '#fff';
+            starCtx.font = '10px Inter';
+            const selectedEpoch = appState.observationEpochs[appState.currentEpoch];
+            const epochLabel = selectedEpoch ? ` · ${new Date(selectedEpoch.timestamp).toISOString().slice(0, 10)}` : '';
+            starCtx.fillText(`${target.name} (tracked)${epochLabel}`, tx + 8, ty + 3);
+        }
+
+        // Logic for primary sky canvas (placeholder or migrated)
+        let skyCanvas, skyCtx;
+        function initCanvas() {
+            skyCanvas = document.getElementById('skyCanvas');
+            if (skyCanvas) skyCtx = skyCanvas.getContext('2d');
+            window.addEventListener('resize', drawSky);
+=======
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
+=======
         let currentTarget = targetPresets.cosmos;
         let currentEpoch = 1;
         let canvas, ctx, spectrumChart;
@@ -229,6 +1571,7 @@
         function resizeCanvas() {
             canvas.width = canvas.parentElement.clientWidth;
             canvas.height = canvas.parentElement.clientHeight;
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
             drawSky();
         }
 
@@ -252,6 +1595,142 @@
         }
 
         function drawSky() {
+<<<<<<< HEAD
+<<<<<<< HEAD
+            if (!skyCtx) return;
+            const w = skyCanvas.width = skyCanvas.parentElement.clientWidth;
+            const h = skyCanvas.height = skyCanvas.parentElement.clientHeight;
+            skyCtx.fillStyle = '#05080f';
+            skyCtx.fillRect(0, 0, w, h);
+            
+            if (!appState.currentTarget) {
+                skyCtx.fillStyle = '#475569';
+                skyCtx.textAlign = 'center';
+                skyCtx.fillText('Select a target to view SPHEREx Survey data', w/2, h/2);
+            } else {
+                const target = appState.currentTarget;
+                // Survey view
+                skyCtx.strokeStyle = '#06b6d4';
+                skyCtx.lineWidth = 1;
+                skyCtx.strokeRect(w/4, h/4, w/2, h/2);
+                
+                // Detailed data display
+                skyCtx.fillStyle = '#fff';
+                skyCtx.font = 'bold 14px Inter';
+                skyCtx.textAlign = 'left';
+                skyCtx.fillText(target.name, 20, 30);
+                
+                skyCtx.font = '12px Inter';
+                skyCtx.fillStyle = '#94a3b8';
+                if (target.chem) skyCtx.fillText('Detected Chemicals: ' + target.chem, 20, 50);
+                const epoch = appState.observationEpochs[appState.currentEpoch];
+                skyCtx.fillText(epoch
+                    ? `SPHEREx observation date: ${formatEpochDate(epoch.timestamp)} (${epoch.observations} observation${epoch.observations === 1 ? '' : 's'})`
+                    : backgroundSourceStatus.SPHEREx === 'loading'
+                        ? 'SPHEREx observation date: loading...'
+                        : backgroundSourceStatus.SPHEREx === 'error'
+                            ? 'SPHEREx observation date: unavailable'
+                            : backgroundSourceStatus.SPHEREx === 'empty'
+                                ? 'SPHEREx observation date: no observations for this field'
+                                : 'SPHEREx observation date: no dated observations available', 20, 70);
+
+                let motionText = 'Target motion: no Gaia proper-motion match available.';
+                if (appState.targetMotionState === 'loading') motionText = 'Target motion: checking Gaia DR3 proper motion...';
+                else if (appState.targetMotionState === 'error') motionText = `Target motion: unavailable (${appState.targetMotionError})`;
+                else if (appState.targetMotion) {
+                    const trackedPosition = getTrackedTargetPosition(target);
+                    const displacementArcsec = angularSeparationDegrees(
+                        appState.targetMotion.ra,
+                        appState.targetMotion.dec,
+                        trackedPosition.ra,
+                        trackedPosition.dec
+                    ) * 3600;
+                    motionText = `Gaia DR3 proper motion: ${appState.targetMotion.pmra.toFixed(1)} / ${appState.targetMotion.pmdec.toFixed(1)} mas/yr · movement since Gaia epoch ${displacementArcsec.toFixed(3)} arcsec`;
+                } else if (!supportsGaiaProperMotion(target)) {
+                    motionText = target.isField
+                        ? 'Target motion: not applicable to a survey field.'
+                        : 'Target motion: Gaia stellar proper motion is not applicable to this object type.';
+                }
+                skyCtx.fillText(motionText, 20, 90, Math.max(100, w - 40));
+
+                const trackedPosition = getTrackedTargetPosition(target);
+                skyCtx.fillStyle = '#06b6d4';
+                skyCtx.fillText(`Tracked position: RA ${trackedPosition.ra.toFixed(6)}° · Dec ${trackedPosition.dec.toFixed(6)}°`, 20, 110);
+
+                const motionBox = {
+                    x: Math.max(20, w - Math.min(280, w * 0.38) - 24),
+                    y: Math.max(130, h - 150),
+                    width: Math.min(280, w * 0.38),
+                    height: Math.min(130, Math.max(80, h - 150))
+                };
+                skyCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+                skyCtx.fillRect(motionBox.x, motionBox.y, motionBox.width, motionBox.height);
+                skyCtx.strokeStyle = '#334155';
+                skyCtx.strokeRect(motionBox.x, motionBox.y, motionBox.width, motionBox.height);
+
+                if (appState.observationEpochs.length >= 2 && appState.targetMotion) {
+                    const positions = appState.observationEpochs.map(epoch => getTrackedTargetPosition(target, epoch));
+                    const first = positions[0];
+                    const cosDec = Math.cos(first.dec * Math.PI / 180);
+                    const offsets = positions.map(position => ({
+                        x: (((position.ra - first.ra + 540) % 360) - 180) * cosDec * 3600,
+                        y: (position.dec - first.dec) * 3600
+                    }));
+                    const actualExtent = Math.max(
+                        ...offsets.map(point => Math.max(Math.abs(point.x), Math.abs(point.y)))
+                    );
+                    const scaleExtent = Math.max(actualExtent, 0.000001);
+                    const padding = 18;
+                    const scale = Math.min(
+                        (motionBox.width - 2 * padding) / (2 * scaleExtent),
+                        (motionBox.height - 2 * padding - 16) / (2 * scaleExtent)
+                    );
+                    const centerX = motionBox.x + motionBox.width / 2;
+                    const centerY = motionBox.y + (motionBox.height + 16) / 2;
+                    const pixelPoints = offsets.map(point => ({
+                        x: centerX + point.x * scale,
+                        y: centerY - point.y * scale
+                    }));
+
+                    skyCtx.fillStyle = '#cbd5e1';
+                    skyCtx.font = '9px Inter';
+                    skyCtx.textAlign = 'left';
+                    skyCtx.fillText(`Proper-motion path (zoomed; extent ${actualExtent.toPrecision(3)} arcsec)`, motionBox.x + 8, motionBox.y + 13);
+                    skyCtx.strokeStyle = '#22d3ee';
+                    skyCtx.lineWidth = 1.5;
+                    skyCtx.beginPath();
+                    pixelPoints.forEach((point, index) => {
+                        if (index === 0) skyCtx.moveTo(point.x, point.y);
+                        else skyCtx.lineTo(point.x, point.y);
+                    });
+                    skyCtx.stroke();
+                    pixelPoints.forEach((point, index) => {
+                        skyCtx.fillStyle = index === appState.currentEpoch ? '#22d3ee' : '#94a3b8';
+                        skyCtx.beginPath();
+                        skyCtx.arc(point.x, point.y, index === appState.currentEpoch ? 4 : 2.5, 0, Math.PI * 2);
+                        skyCtx.fill();
+                    });
+                    skyCtx.fillStyle = '#94a3b8';
+                    skyCtx.font = '8px Inter';
+                    skyCtx.fillText(formatEpochDate(appState.observationEpochs[0].timestamp), motionBox.x + 8, motionBox.y + motionBox.height - 5);
+                    const lastDate = formatEpochDate(appState.observationEpochs.at(-1).timestamp);
+                    skyCtx.textAlign = 'right';
+                    skyCtx.fillText(lastDate, motionBox.x + motionBox.width - 8, motionBox.y + motionBox.height - 5);
+                    skyCtx.textAlign = 'left';
+                } else {
+                    skyCtx.fillStyle = '#94a3b8';
+                    skyCtx.font = '10px Inter';
+                    skyCtx.textAlign = 'left';
+                    const message = appState.targetMotion
+                        ? 'Need at least two dated observations'
+                        : appState.targetMotionState === 'loading'
+                            ? 'Checking Gaia DR3 proper motion...'
+                            : 'No measured Gaia stellar motion available';
+                    skyCtx.fillText(message, motionBox.x + 8, motionBox.y + motionBox.height / 2);
+                }
+=======
+=======
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
             if (!ctx) return;
             const w = canvas.width, h = canvas.height;
             ctx.fillStyle = '#060a12';
@@ -298,6 +1777,127 @@
             ctx.fillStyle = '#38bdf8';
             ctx.font = '11px Inter, sans-serif';
             ctx.fillText(`${currentTarget.name} (Selected Target)`, cx + 18, cy + 4);
+<<<<<<< HEAD
+        }
+
+        function initChart() {
+            const chartCtx = document.getElementById('spectrumChart').getContext('2d');
+            spectrumChart = new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: ['0.75μm', '1.0μm', '1.25μm', '1.5μm', '1.75μm', '2.0μm', '2.25μm', '2.5μm', '2.75μm', '3.0μm', '3.25μm', '3.5μm', '3.75μm', '4.0μm', '4.25μm', '4.5μm', '5.0μm'],
+                    datasets: [{
+                        label: 'Relative Flux (mJy)',
+                        data: currentTarget.flux,
+                        borderColor: '#0B3D91',
+                        backgroundColor: 'rgba(11, 61, 145, 0.25)',
+                        pointBorderColor: '#FC3D21',
+                        pointBackgroundColor: '#FC3D21',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(22,38,77,0.5)' } },
+                        y: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(22,38,77,0.5)' } }
+                    }
+                }
+            });
+        }
+
+        function selectPresetTarget(key) {
+            currentTarget = targetPresets[key];
+            updateDashboardMetrics(currentTarget);
+            triggerAIInsight(currentTarget.name, currentTarget.chem);
+        }
+
+        async function handleTargetSearch(query) {
+            if (!query.trim()) return;
+            document.getElementById('meta-name').innerText = query;
+            document.getElementById('aiStatus').innerText = 'RESOLVING...';
+
+            if (window.spherexAPI && window.spherexAPI.resolveObject) {
+                try {
+                    const res = await window.spherexAPI.resolveObject(query);
+                    if (res) {
+                        document.getElementById('meta-ra').innerText = res.ra || '150.119';
+                        document.getElementById('meta-dec').innerText = res.dec || '+2.205';
+                    }
+                } catch(e) { console.log('NASA Query error:', e); }
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
+            }
+
+            let seed = query.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            let dynamicFlux = Array.from({length: 17}, (_, i) => Math.abs(Math.sin(i + seed) * 28) + 4);
+
+            currentTarget = {
+                name: query,
+                type: "Survey Target",
+                dist: `${(seed % 500) / 10} ly`,
+                chem: "IR Absorption Lines",
+                ra: (100 + (seed % 180)).toFixed(3),
+                dec: (-30 + (seed % 60)).toFixed(3),
+                flux: dynamicFlux
+            };
+
+            updateDashboardMetrics(currentTarget);
+            triggerAIInsight(query, "Infrared spectral features mapped by SPHEREx");
+        }
+
+<<<<<<< HEAD
+        function togglePlayTimeline() {
+            if (appState.observationEpochs.length < 2) return;
+            appState.isPlaying = !appState.isPlaying;
+            if (timelineTimer) {
+                clearInterval(timelineTimer);
+                timelineTimer = null;
+            }
+            if (appState.isPlaying) {
+                if (appState.currentEpoch >= appState.observationEpochs.length - 1) {
+                    appState.currentEpoch = 0;
+                    if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+                    drawSky();
+                }
+                timelineTimer = setInterval(() => {
+                    if (appState.currentEpoch >= appState.observationEpochs.length - 1) {
+                        appState.isPlaying = false;
+                        clearInterval(timelineTimer);
+                        timelineTimer = null;
+                        updateTimeline();
+                        return;
+                    }
+                    stepTimeline(1);
+                }, 1000);
+            }
+            updateTimeline();
+        }
+
+        function stepTimeline(dir) {
+            const lastEpoch = appState.observationEpochs.length - 1;
+            if (lastEpoch < 0) return;
+            appState.currentEpoch = Math.max(0, Math.min(lastEpoch, appState.currentEpoch + dir));
+            updateTimeline();
+            if (appState.currentTarget) plotStarAndSurroundings(appState.currentTarget);
+=======
+        function updateDashboardMetrics(target) {
+            document.getElementById('meta-name').innerText = target.name;
+            document.getElementById('meta-type').innerText = target.type;
+            document.getElementById('meta-dist').innerText = target.dist;
+            document.getElementById('meta-chem').innerText = target.chem;
+            document.getElementById('meta-ra').innerText = target.ra;
+            document.getElementById('meta-dec').innerText = target.dec;
+            document.getElementById('skyCoordLabel').innerText = `RA ${target.ra} / DEC ${target.dec}`;
+
+            spectrumChart.data.datasets[0].data = target.flux;
+            spectrumChart.update();
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
+=======
         }
 
         function initChart() {
@@ -380,6 +1980,7 @@
 
             spectrumChart.data.datasets[0].data = target.flux;
             spectrumChart.update();
+>>>>>>> 0ff6d0f6efd68d0dbcf51b799a644fff69f534b2
             drawSky();
         }
 
