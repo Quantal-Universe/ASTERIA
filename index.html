@@ -106,8 +106,32 @@
             </div>
             
             <div id="lowerWorkspace" class="flex-1 min-h-0 flex overflow-hidden">
-                <div class="flex-1 min-w-0 relative overflow-hidden" id="skyCanvasContainer">
-                    <canvas id="skyCanvas" class="w-full h-full block"></canvas>
+                <div class="flex-1 min-w-0 flex flex-col overflow-y-auto" id="skyCanvasContainer">
+                    <div id="skyView" class="relative h-[260px] min-h-[220px] shrink-0 overflow-hidden">
+                        <canvas id="skyCanvas" class="w-full h-full block"></canvas>
+                    </div>
+                    <section id="spectrumPanel" class="min-h-[320px] shrink-0 border-t border-slate-700 bg-slate-950/80 p-3" aria-labelledby="spectrumTitle">
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <h2 id="spectrumTitle" class="text-xs font-semibold text-slate-100">SPHEREx measured wavelength samples</h2>
+                                <p class="text-[9px] text-slate-500">Calibrated target-pixel surface brightness · detector arrays D1–D6</p>
+                            </div>
+                            <button id="loadSpectrumBtn" type="button" class="shrink-0 rounded border border-cyan-800 bg-cyan-950/60 px-2 py-1 text-[9px] text-cyan-200 hover:bg-cyan-900 disabled:opacity-40" disabled>Load spectra</button>
+                        </div>
+                        <p id="spectrumStatus" class="mt-2 text-[9px] text-slate-400" role="status" aria-live="polite">Select a target, then load its available SPHEREx measurements.</p>
+                        <div id="spectrumLegend" class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] text-slate-300" aria-label="Toggle detector arrays">
+                            <label class="flex items-center gap-1"><input type="checkbox" data-spectrum-detector="D1" checked> <span class="text-cyan-300">D1</span></label>
+                            <label class="flex items-center gap-1"><input type="checkbox" data-spectrum-detector="D2" checked> <span class="text-violet-300">D2</span></label>
+                            <label class="flex items-center gap-1"><input type="checkbox" data-spectrum-detector="D3" checked> <span class="text-emerald-300">D3</span></label>
+                            <label class="flex items-center gap-1"><input type="checkbox" data-spectrum-detector="D4" checked> <span class="text-amber-300">D4</span></label>
+                            <label class="flex items-center gap-1"><input type="checkbox" data-spectrum-detector="D5" checked> <span class="text-pink-300">D5</span></label>
+                            <label class="flex items-center gap-1"><input type="checkbox" data-spectrum-detector="D6" checked> <span class="text-sky-300">D6</span></label>
+                        </div>
+                        <div class="mt-1 overflow-x-auto rounded border border-slate-800 bg-slate-950">
+                            <svg id="spectrumChart" class="h-[240px] w-full min-w-[560px]" viewBox="0 0 760 240" role="img" aria-label="SPHEREx target-pixel measurements by wavelength"></svg>
+                        </div>
+                        <p class="mt-2 text-[8px] leading-relaxed text-slate-500">Loads up to 17 recent products per detector (up to 102 samples), a quick-look subset rather than a complete 102-band source extraction. Each point is the calibrated pixel at the selected coordinate for that exposure date (Gaia proper motion applied when available), in MJy/sr; it is not PSF-extracted point-source photometry. Error bars use archive variance. Flagged pixels are hollow and excluded from same-day inverse-variance combinations. Wavelength and bandwidth come from the detector WCS lookup.</p>
+                    </section>
                 </div>
                 <section id="chatPanel" class="w-1/2 min-w-[300px] border-l border-slate-700 bg-slate-950 flex flex-col min-h-0" aria-label="DeepSeek research chat">
                     <div class="px-3 py-1.5 border-b border-slate-700 flex items-center justify-between gap-3">
@@ -118,7 +142,7 @@
                         <button id="clearChatBtn" type="button" class="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded border border-slate-700" title="Clear conversation">Clear</button>
                     </div>
                     <div id="chatMessages" class="flex-1 min-h-0 overflow-y-auto p-2 space-y-2" aria-live="polite">
-                        <div class="text-xs text-slate-400 leading-relaxed">Ask a question to start. This chat uses your OpenRouter session and does not receive target context yet.</div>
+                        <div class="text-xs text-slate-400 leading-relaxed">Ask a question to start. When a target or survey field is selected, the chat receives its details and the available survey context.</div>
                     </div>
                     <div class="border-t border-slate-700 p-2 space-y-1">
                         <div class="flex items-center justify-between gap-2">
@@ -292,7 +316,7 @@
             gridVisible: true,
             showMotionVectors: true,
             diffMode: false,
-            collection: 'spherex_qr3',
+            collection: 'spherex_qr2',
             currentEpoch: 0,
             isPlaying: false,
             realData: [],
@@ -302,15 +326,47 @@
             targetMotionError: '',
             chatMessages: [],
             chatAuthenticated: false,
+            spectrumSamples: [],
+            spectrumState: 'idle',
+            spectrumError: '',
+            spectrumProgressMessage: '',
+            spectrumFailures: [],
+            spectrumAdditionalFailureCount: 0,
+            spectrumProductCount: 0,
             filters: { band1: true, band2: true, band3: true, band4: true, band5: true, band6: true },
             currentTarget: null
+        };
+        const spectrumDetectorColors = {
+            D1: '#67e8f9',
+            D2: '#c4b5fd',
+            D3: '#6ee7b7',
+            D4: '#fcd34d',
+            D5: '#f9a8d4',
+            D6: '#7dd3fc'
         };
         const backgroundRadiusDegrees = 1;
         const backgroundSourceStatus = { 'Gaia DR3': 'idle', SPHEREx: 'idle', SIMBAD: 'idle' };
         const backgroundSourceErrors = {};
         let backgroundRequestId = 0;
+        let activeSpectrumRequestId = null;
         let timelineTimer = null;
         let chatPending = false;
+
+        window.spherexAPI.onSpectrumProgress(progress => {
+            if (progress.requestId !== activeSpectrumRequestId || activeSpectrumRequestId !== backgroundRequestId) return;
+            if (progress.phase === 'search') {
+                appState.spectrumProgressMessage = `Searching detector coverage: ${progress.completedDetectors}/${progress.totalDetectors} arrays${progress.detector ? ` · ${progress.detector} (${progress.productCount} products)` : ''}…`;
+            } else {
+                appState.spectrumProgressMessage = `Sampling archive pixels: ${progress.completedProducts}/${progress.totalProducts} products${progress.failureCount ? ` · ${progress.failureCount} issue${progress.failureCount === 1 ? '' : 's'}` : ''}…`;
+                appState.spectrumProductCount = progress.totalProducts;
+                if (progress.sample) appState.spectrumSamples.push(progress.sample);
+            }
+            const status = document.getElementById('spectrumStatus');
+            if (status) status.textContent = appState.spectrumProgressMessage;
+            if (progress.phase === 'sampling' && (progress.completedProducts % 4 === 0 || progress.completedProducts === progress.totalProducts)) {
+                renderSpectrum();
+            }
+        });
 
         function renderChatMessages() {
             const container = document.getElementById('chatMessages');
@@ -320,7 +376,7 @@
             if (appState.chatMessages.length === 0) {
                 const intro = document.createElement('div');
                 intro.className = 'text-xs text-slate-400 leading-relaxed';
-                intro.textContent = 'Ask a question to start. This chat uses your OpenRouter session and does not receive target context yet.';
+                intro.textContent = 'Ask a question to start. When a target or survey field is selected, the chat receives its details and the available survey context.';
                 container.appendChild(intro);
                 return;
             }
@@ -334,6 +390,318 @@
                 container.appendChild(bubble);
             }
             container.scrollTop = container.scrollHeight;
+        }
+
+        function createSpectrumElement(name, attributes = {}, text) {
+            const element = document.createElementNS('http://www.w3.org/2000/svg', name);
+            for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+            if (text !== undefined) element.textContent = text;
+            return element;
+        }
+
+        function combineSpectrumSamples(samples) {
+            const usable = samples
+                .filter(sample => sample.flags === 0 && sample.varianceMjy2Sr2 > 0)
+                .sort((a, b) => a.timestamp - b.timestamp || a.wavelengthUm - b.wavelengthUm);
+            const groups = [];
+            for (const sample of usable) {
+                const date = new Date(sample.timestamp).toISOString().slice(0, 10);
+                const start = sample.wavelengthUm - sample.bandwidthUm / 2;
+                const end = sample.wavelengthUm + sample.bandwidthUm / 2;
+                let group = groups[groups.length - 1];
+                if (!group || group.date !== date || start > group.end) {
+                    group = { date, start, end, weight: 0, weightedWavelength: 0, weightedFlux: 0, count: 0 };
+                    groups.push(group);
+                }
+                const weight = 1 / sample.varianceMjy2Sr2;
+                group.start = Math.min(group.start, start);
+                group.end = Math.max(group.end, end);
+                group.weight += weight;
+                group.weightedWavelength += sample.wavelengthUm * weight;
+                group.weightedFlux += sample.fluxMjySr * weight;
+                group.count += 1;
+            }
+            return groups.map(group => ({
+                wavelengthUm: group.weightedWavelength / group.weight,
+                fluxMjySr: group.weightedFlux / group.weight,
+                uncertaintyMjySr: Math.sqrt(1 / group.weight),
+                bandwidthUm: group.end - group.start,
+                date: group.date,
+                count: group.count
+            }));
+        }
+
+        function renderSpectrum() {
+            const chart = document.getElementById('spectrumChart');
+            const status = document.getElementById('spectrumStatus');
+            const loadButton = document.getElementById('loadSpectrumBtn');
+            if (!chart || !status || !loadButton) return;
+            chart.replaceChildren();
+            loadButton.disabled = !appState.currentTarget || appState.spectrumState === 'loading';
+            loadButton.textContent = appState.spectrumState === 'loading' ? 'Loading…' : 'Load spectra';
+
+            if (appState.spectrumState === 'loading') {
+                status.textContent = appState.spectrumProgressMessage || 'Querying calibrated QR2 products and sampling the selected sky coordinate…';
+            } else if (appState.spectrumState === 'error') {
+                status.textContent = appState.spectrumError;
+            } else if (appState.spectrumSamples.length) {
+                const validCount = appState.spectrumSamples.filter(sample => sample.flags === 0).length;
+                const flaggedCount = appState.spectrumSamples.length - validCount;
+                const detectors = [...new Set(appState.spectrumSamples.map(sample => sample.detector))].sort().join(', ');
+                const wavelengths = appState.spectrumSamples.map(sample => sample.wavelengthUm);
+                const range = `${Math.min(...wavelengths).toFixed(3)}–${Math.max(...wavelengths).toFixed(3)} μm`;
+                const failureCount = appState.spectrumFailures.length + appState.spectrumAdditionalFailureCount;
+                const failures = failureCount
+                    ? ` ${failureCount} product read${failureCount === 1 ? '' : 's'} failed.`
+                    : '';
+                status.textContent = `${appState.spectrumSamples.length} real samples from ${appState.spectrumProductCount} QR2 products · ${detectors} · ${range} · ${validCount} unflagged${flaggedCount ? `, ${flaggedCount} flagged` : ''}.${failures}`;
+            } else if (appState.spectrumState === 'empty') {
+                status.textContent = 'No calibrated SPHEREx QR2 detector images cover this coordinate.';
+            } else if (!appState.currentTarget) {
+                status.textContent = 'Select a target, then load its available SPHEREx measurements.';
+            } else {
+                status.textContent = 'Ready to load up to 17 recent products per detector array (up to 102 real samples).';
+            }
+
+            if (appState.spectrumFailures.length) {
+                status.title = [
+                    ...appState.spectrumFailures,
+                    ...(appState.spectrumAdditionalFailureCount ? [`${appState.spectrumAdditionalFailureCount} additional product failures not shown.`] : [])
+                ].join('\n');
+            } else {
+                status.removeAttribute('title');
+            }
+
+            const detectorInputs = [...document.querySelectorAll('[data-spectrum-detector]')];
+            const enabled = new Set(detectorInputs.filter(input => input.checked).map(input => input.dataset.spectrumDetector));
+            const samples = appState.spectrumSamples.filter(sample => (
+                enabled.has(sample.detector)
+                && Number.isFinite(sample.wavelengthUm)
+                && Number.isFinite(sample.fluxMjySr)
+                && sample.wavelengthUm >= 0.7
+                && sample.wavelengthUm <= 5.1
+            ));
+            const combined = combineSpectrumSamples(samples);
+            const width = 760;
+            const height = 240;
+            const margin = { left: 62, right: 18, top: 20, bottom: 38 };
+            const plotWidth = width - margin.left - margin.right;
+            const plotHeight = height - margin.top - margin.bottom;
+            const xMin = 0.7;
+            const xMax = 5.1;
+            const x = value => margin.left + (value - xMin) / (xMax - xMin) * plotWidth;
+            const visibleValues = samples.flatMap(sample => {
+                const uncertainty = sample.varianceMjy2Sr2 >= 0 ? Math.sqrt(sample.varianceMjy2Sr2) : 0;
+                return [sample.fluxMjySr - uncertainty, sample.fluxMjySr + uncertainty];
+            });
+            if (visibleValues.length === 0) {
+                chart.appendChild(createSpectrumElement('text', {
+                    x: width / 2, y: height / 2, fill: '#94a3b8', 'font-size': 12, 'text-anchor': 'middle'
+                }, appState.spectrumSamples.length ? 'No samples for the selected detector filters' : 'Measured samples will appear here'));
+                return;
+            }
+
+            let yMin = Math.min(...visibleValues);
+            let yMax = Math.max(...visibleValues);
+            if (yMin === yMax) {
+                const padding = Math.max(Math.abs(yMin) * 0.1, 0.01);
+                yMin -= padding;
+                yMax += padding;
+            } else {
+                const padding = (yMax - yMin) * 0.08;
+                yMin -= padding;
+                yMax += padding;
+            }
+            const y = value => margin.top + (yMax - value) / (yMax - yMin) * plotHeight;
+            const plot = createSpectrumElement('g');
+            chart.appendChild(plot);
+
+            for (const wavelength of [0.75, 1, 1.5, 2, 3, 4, 5]) {
+                const px = x(wavelength);
+                plot.appendChild(createSpectrumElement('line', {
+                    x1: px, x2: px, y1: margin.top, y2: margin.top + plotHeight,
+                    stroke: '#1e293b', 'stroke-width': 1
+                }));
+                plot.appendChild(createSpectrumElement('text', {
+                    x: px, y: height - 19, fill: '#94a3b8', 'font-size': 9, 'text-anchor': 'middle'
+                }, wavelength.toFixed(1)));
+            }
+            for (let tick = 0; tick <= 3; tick += 1) {
+                const value = yMin + tick * (yMax - yMin) / 3;
+                const py = y(value);
+                plot.appendChild(createSpectrumElement('line', {
+                    x1: margin.left, x2: width - margin.right, y1: py, y2: py,
+                    stroke: '#1e293b', 'stroke-width': 1
+                }));
+                plot.appendChild(createSpectrumElement('text', {
+                    x: margin.left - 7, y: py + 3, fill: '#94a3b8', 'font-size': 8, 'text-anchor': 'end'
+                }, value.toPrecision(3)));
+            }
+            plot.appendChild(createSpectrumElement('text', {
+                x: margin.left + plotWidth / 2, y: height - 3, fill: '#cbd5e1', 'font-size': 9, 'text-anchor': 'middle'
+            }, 'Wavelength (μm)'));
+            plot.appendChild(createSpectrumElement('text', {
+                x: 13, y: margin.top + plotHeight / 2, fill: '#cbd5e1', 'font-size': 9,
+                'text-anchor': 'middle', transform: `rotate(-90 13 ${margin.top + plotHeight / 2})`
+            }, 'Surface brightness (MJy/sr)'));
+
+            for (const sample of samples) {
+                const px = x(sample.wavelengthUm);
+                const uncertainty = Math.sqrt(sample.varianceMjy2Sr2);
+                const py = y(sample.fluxMjySr);
+                const color = spectrumDetectorColors[sample.detector] || '#e2e8f0';
+                const flagged = sample.flags !== 0;
+                const group = createSpectrumElement('g');
+                const title = `${sample.detector} · ${formatEpochDate(sample.timestamp)} · RA ${sample.trackedRa.toFixed(6)}°, Dec ${sample.trackedDec.toFixed(6)}° · ${sample.wavelengthUm.toFixed(4)} ± ${(sample.bandwidthUm / 2).toFixed(4)} μm · ${sample.fluxMjySr.toPrecision(5)} ± ${uncertainty.toPrecision(3)} MJy/sr · flags ${sample.flags} · ${sample.observationId}`;
+                group.appendChild(createSpectrumElement('title', {}, title));
+                group.appendChild(createSpectrumElement('line', {
+                    x1: x(Math.max(xMin, sample.wavelengthUm - sample.bandwidthUm / 2)),
+                    x2: x(Math.min(xMax, sample.wavelengthUm + sample.bandwidthUm / 2)),
+                    y1: py, y2: py, stroke: color, 'stroke-opacity': 0.55, 'stroke-width': 1
+                }));
+                group.appendChild(createSpectrumElement('line', {
+                    x1: px, x2: px, y1: y(sample.fluxMjySr - uncertainty), y2: y(sample.fluxMjySr + uncertainty),
+                    stroke: color, 'stroke-opacity': 0.8, 'stroke-width': 1
+                }));
+                group.appendChild(createSpectrumElement('circle', {
+                    cx: px, cy: py, r: 3.2, fill: flagged ? '#0b1020' : color, stroke: color, 'stroke-width': 1.4
+                }));
+                plot.appendChild(group);
+            }
+
+            for (const point of combined) {
+                if (point.count < 2) continue;
+                const px = x(point.wavelengthUm);
+                const py = y(point.fluxMjySr);
+                const marker = createSpectrumElement('circle', {
+                    cx: px, cy: py, r: 5, fill: 'none', stroke: '#f8fafc', 'stroke-width': 1.2
+                });
+                marker.appendChild(createSpectrumElement('title', {}, `${point.count} overlapping unflagged measurements inverse-variance combined on ${point.date}`));
+                plot.appendChild(marker);
+            }
+        }
+
+        document.getElementById('loadSpectrumBtn').addEventListener('click', async () => {
+            const target = appState.currentTarget;
+            if (!target || appState.spectrumState === 'loading') return;
+            const requestId = backgroundRequestId;
+            appState.spectrumSamples = [];
+            appState.spectrumFailures = [];
+            appState.spectrumAdditionalFailureCount = 0;
+            appState.spectrumProductCount = 0;
+            appState.spectrumError = '';
+            appState.spectrumState = 'loading';
+            appState.spectrumProgressMessage = 'Searching IRSA for calibrated detector coverage…';
+            activeSpectrumRequestId = requestId;
+            renderSpectrum();
+
+            try {
+                const motion = appState.targetMotionState === 'loaded' && appState.targetMotion
+                    ? {
+                        ra: appState.targetMotion.ra,
+                        dec: appState.targetMotion.dec,
+                        pmra: appState.targetMotion.pmra,
+                        pmdec: appState.targetMotion.pmdec,
+                        refEpoch: appState.targetMotion.refEpoch
+                    }
+                    : null;
+                const result = await window.spherexAPI.loadSpectrum({
+                    ra: target.ra,
+                    dec: target.dec,
+                    motion,
+                    requestId
+                });
+                if (requestId !== backgroundRequestId || appState.currentTarget !== target) return;
+                activeSpectrumRequestId = null;
+                if (!result.success) {
+                    appState.spectrumError = result.error || 'SPHEREx spectrum request failed.';
+                    appState.spectrumState = appState.spectrumError.startsWith('No calibrated SPHEREx')
+                        ? 'empty'
+                        : 'error';
+                } else {
+                    appState.spectrumSamples = result.samples;
+                    appState.spectrumFailures = result.failures || [];
+                    appState.spectrumAdditionalFailureCount = result.additionalFailureCount || 0;
+                    appState.spectrumProductCount = result.productCount;
+                    appState.spectrumState = result.samples.length ? 'loaded' : 'empty';
+                }
+            } catch (error) {
+                if (requestId !== backgroundRequestId || appState.currentTarget !== target) return;
+                activeSpectrumRequestId = null;
+                appState.spectrumError = `Could not load SPHEREx spectrum: ${error.message}`;
+                appState.spectrumState = 'error';
+            }
+            renderSpectrum();
+        });
+
+        document.querySelectorAll('[data-spectrum-detector]').forEach(input => {
+            input.addEventListener('change', renderSpectrum);
+        });
+
+        function buildResearchContextPrompt() {
+            const context = [
+                'You are a clear, helpful astronomy research assistant. Answer accurately and concisely. If uncertain, say so.',
+                'Use the active target/study context below to explain what the user is examining, what the available observations can help investigate, and the relevant details. Distinguish catalog facts from interpretation. Do not invent a formal study title, hypothesis, results, object properties, or observational data that are not supplied. If no target is selected, say that and invite the user to select one.'
+            ];
+            const target = appState.currentTarget;
+            if (!target) {
+                context.push('Active study context: no target or survey field is currently selected.');
+                return context.join('\n\n');
+            }
+
+            const targetDetails = [
+                `Selected target/study: ${target.name || target.id || 'Unnamed target'}`,
+                `Target type: ${target.type || 'Not specified in the selected catalog entry'}`,
+                `Coordinates (ICRS): RA ${target.ra}°, Dec ${target.dec}°`,
+                `Distance: ${getDistanceDescription(target)}`,
+                `Catalog description: ${target.desc || 'No description supplied by the selected catalog entry.'}`,
+                `SPHEREx collection selected in the app: ${appState.collection}`
+            ];
+            if (target.isField) {
+                targetDetails.push('This selection is a survey field, not a single celestial object.');
+            }
+
+            const epochs = appState.observationEpochs;
+            const observationCount = epochs.reduce((total, epoch) => total + epoch.observations, 0);
+            if (epochs.length) {
+                targetDetails.push(
+                    `Loaded SPHEREx observation-footprint dates: ${epochs.length} distinct dates from ${formatEpochDate(epochs[0].timestamp)} through ${formatEpochDate(epochs[epochs.length - 1].timestamp)} (${observationCount} footprint records grouped by date). Current timeline date: ${formatEpochDate(epochs[appState.currentEpoch]?.timestamp ?? epochs[0].timestamp)}.`
+                );
+            } else {
+                const spherexStatus = backgroundSourceStatus.SPHEREx;
+                targetDetails.push(`SPHEREx observation dates: ${spherexStatus === 'loading' ? 'still loading' : spherexStatus === 'error' ? 'unavailable due to a query error' : spherexStatus === 'empty' ? 'none found for this field' : 'not loaded'}.`);
+            }
+
+            const gaiaSources = appState.realData.filter(source => source.source === 'Gaia DR3');
+            const gaiaStars = gaiaSources.filter(source => source.catalogClass === 'Star').length;
+            const gaiaGalaxies = gaiaSources.filter(source => source.catalogClass === 'Galaxy').length;
+            const gaiaQuasars = gaiaSources.filter(source => source.catalogClass === 'Quasar').length;
+            targetDetails.push(
+                `Gaia DR3 sources currently loaded in the field: ${gaiaSources.length} (${gaiaStars} star candidates, ${gaiaGalaxies} galaxy candidates, ${gaiaQuasars} quasar candidates; classifier labels are candidates, not definitive identifications).`
+            );
+            targetDetails.push(`SIMBAD named-star references currently loaded: ${appState.realData.filter(source => source.source === 'SIMBAD').length}.`);
+            targetDetails.push('SPHEREx rows are observation footprints, not per-object detections or classifications. The app has not supplied a formal proposal or hypothesis; explain study purpose as a reasonable interpretation of the selected target and available data, and label it as such.');
+            if (appState.spectrumState === 'loading') {
+                targetDetails.push('SPHEREx calibrated pixel-spectrum samples are currently loading.');
+            } else if (appState.spectrumState === 'loaded' && appState.spectrumSamples.length) {
+                const goodSamples = appState.spectrumSamples.filter(sample => sample.flags === 0);
+                const detectorNames = [...new Set(appState.spectrumSamples.map(sample => sample.detector))].sort().join(', ');
+                const wavelengthMin = Math.min(...appState.spectrumSamples.map(sample => sample.wavelengthUm));
+                const wavelengthMax = Math.max(...appState.spectrumSamples.map(sample => sample.wavelengthUm));
+                const dates = appState.spectrumSamples.map(sample => sample.timestamp);
+                const firstDate = formatEpochDate(Math.min(...dates));
+                const lastDate = formatEpochDate(Math.max(...dates));
+                const failedProducts = appState.spectrumFailures.length + appState.spectrumAdditionalFailureCount;
+                targetDetails.push(
+                    `Loaded SPHEREx QR2 measured target-pixel samples: ${appState.spectrumSamples.length} across ${detectorNames}, spanning ${wavelengthMin.toFixed(3)}–${wavelengthMax.toFixed(3)} μm from ${firstDate} through ${lastDate}; ${goodSamples.length} have zero quality flags${failedProducts ? ` and ${failedProducts} product reads failed` : ''}. Up to 17 recent products per detector are sampled, so this is a quick-look subset, not a complete 102-band source extraction. Gaia proper motion is applied per exposure when available. These are calibrated surface-brightness values in MJy/sr at the pixel containing the tracked coordinate, not PSF-extracted point-source photometry. Do not treat them as a validated object spectrum or infer physical properties without accounting for background, spatial profile, flagged samples, and incomplete wavelength coverage.`
+                );
+            } else if (appState.spectrumState === 'empty') {
+                targetDetails.push('No calibrated SPHEREx QR2 detector images covering the selected coordinate were found.');
+            } else if (appState.spectrumState === 'error') {
+                targetDetails.push(`SPHEREx measured pixel-spectrum data are unavailable: ${appState.spectrumError}`);
+            }
+            context.push(`Active study context:\n${targetDetails.join('\n')}`);
+            return context.join('\n\n');
         }
 
         async function refreshChatAuthStatus() {
@@ -385,7 +753,7 @@
                     model: 'deepseek/deepseek-chat',
                     messages: appState.chatMessages.slice(-10),
                     maxTokens: 700,
-                    systemPrompt: 'You are a clear, helpful research assistant. Answer accurately and concisely. If uncertain, say so.'
+                    systemPrompt: buildResearchContextPrompt()
                 });
                 const answer = response.choices?.[0]?.message?.content;
                 const answerText = typeof answer === 'string'
@@ -712,6 +1080,9 @@
             const quasarProbabilityIndex = columnIndexes.classprob_dsc_combmod_quasar;
             const temperatureIndex = columnIndexes.teff_gspphot;
             const gravityIndex = columnIndexes.logg_gspphot;
+            const pmraIndex = columnIndexes.pmra;
+            const pmdecIndex = columnIndexes.pmdec;
+            const refEpochIndex = columnIndexes.ref_epoch;
             if ([raIndex, decIndex, idIndex].some(index => index === undefined)) {
                 throw new Error('Gaia TAP response is missing source coordinates or IDs.');
             }
@@ -771,6 +1142,9 @@
                     name: String(row[idIndex]),
                     parallaxMas: numberAt(row, parallaxIndex),
                     parallaxErrorMas: numberAt(row, parallaxErrorIndex),
+                    pmra: numberAt(row, pmraIndex),
+                    pmdec: numberAt(row, pmdecIndex),
+                    refEpoch: numberAt(row, refEpochIndex),
                     classification,
                     classificationDetail
                 };
@@ -858,51 +1232,6 @@
 
         function supportsGaiaProperMotion(target) {
             return Boolean(target && !target.isField && /\b(star|dwarf)\b/i.test(target.type || ''));
-        }
-
-        async function loadTargetMotion(target, requestId) {
-            appState.targetMotion = null;
-            appState.targetMotionError = '';
-            if (!supportsGaiaProperMotion(target) || !window.spherexAPI?.queryGaia) {
-                appState.targetMotionState = 'unavailable';
-                return;
-            }
-
-            appState.targetMotionState = 'loading';
-            const radiusDegrees = 3 / 3600;
-            const decMin = Math.max(-90, target.dec - radiusDegrees);
-            const decMax = Math.min(90, target.dec + radiusDegrees);
-            const cosDec = Math.cos(target.dec * Math.PI / 180);
-            const raHalfWidth = cosDec <= 0 ? 180 : Math.min(180, radiusDegrees / cosDec);
-            const raMin = target.ra - raHalfWidth;
-            const raMax = target.ra + raHalfWidth;
-            let raCondition = '';
-            if (raHalfWidth < 180) {
-                if (raMin < 0) raCondition = ` AND (ra >= ${360 + raMin} OR ra <= ${raMax})`;
-                else if (raMax >= 360) raCondition = ` AND (ra >= ${raMin} OR ra <= ${raMax - 360})`;
-                else raCondition = ` AND ra BETWEEN ${raMin} AND ${raMax}`;
-            }
-            const query = `SELECT TOP 100 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, classprob_dsc_combmod_star FROM gaiadr3.gaia_source WHERE dec BETWEEN ${decMin} AND ${decMax}${raCondition} AND pmra IS NOT NULL AND pmdec IS NOT NULL`;
-
-            try {
-                const response = await window.spherexAPI.queryGaia({ adqlQuery: query });
-                if (!response.success) throw new Error(response.error || 'Gaia proper-motion query failed.');
-                const motion = parseGaiaMotionCandidates(response.data, target);
-                if (requestId !== backgroundRequestId) return;
-                appState.targetMotion = motion;
-                appState.targetMotionState = motion ? 'loaded' : 'unavailable';
-                if (appState.currentTarget) {
-                    plotStarAndSurroundings(appState.currentTarget);
-                    drawSky();
-                }
-            } catch (error) {
-                if (requestId === backgroundRequestId) {
-                    appState.targetMotionState = 'error';
-                    appState.targetMotionError = String(error.message || 'Gaia proper motion is unavailable').slice(0, 100);
-                    console.warn('Gaia target proper motion unavailable.', error);
-                    if (appState.currentTarget) drawSky();
-                }
-            }
         }
 
         function parseSimbadNamedStars(responseText) {
@@ -1036,10 +1365,19 @@
 
         async function loadBackgroundCatalog(source, query, parser, requestId, queryFunction, center) {
             try {
-                const response = await queryFunction({ adqlQuery: query });
+                const response = await queryFunction({ adqlQuery: query, requestId });
+                if (requestId !== backgroundRequestId) return;
                 if (!response.success) throw new Error(response.error || `${source} TAP query failed.`);
                 const sources = parser(response.data, center);
-                if (requestId !== backgroundRequestId) return;
+                if (source === 'Gaia DR3') {
+                    const target = appState.currentTarget;
+                    const motion = supportsGaiaProperMotion(target)
+                        ? parseGaiaMotionCandidates(response.data, target)
+                        : null;
+                    appState.targetMotion = motion;
+                    appState.targetMotionState = motion ? 'loaded' : 'unavailable';
+                    appState.targetMotionError = '';
+                }
                 if (source === 'SPHEREx') {
                     appState.observationEpochs = buildObservationEpochs(sources);
                     appState.currentEpoch = 0;
@@ -1057,6 +1395,10 @@
                 if (requestId === backgroundRequestId) {
                     backgroundSourceStatus[source] = 'error';
                     backgroundSourceErrors[source] = String(error.message || 'request failed').slice(0, 100);
+                    if (source === 'Gaia DR3' && supportsGaiaProperMotion(appState.currentTarget)) {
+                        appState.targetMotionState = 'error';
+                        appState.targetMotionError = String(error.message || 'Gaia proper motion is unavailable').slice(0, 100);
+                    }
                     updateBackgroundCatalogStatus();
                     if (source === 'SPHEREx') {
                         appState.observationEpochs = [];
@@ -1064,6 +1406,7 @@
                         updateTimeline();
                         if (appState.currentTarget) drawSky();
                     }
+                    if (source === 'Gaia DR3' && appState.currentTarget) drawSky();
                 }
                 console.warn(`${source} background data unavailable.`, error);
             }
@@ -1083,14 +1426,21 @@
             const radius = backgroundRadiusDegrees;
             const spherexBounds = getConeSearchBounds(ra, dec, radius, 's_ra');
             const gaiaBounds = getConeSearchBounds(ra, dec, radius);
-            const spherexQuery = `SELECT TOP 20 s_ra, s_dec, obs_id, obs_collection, t_min, t_max FROM spherex.obscore WHERE s_dec BETWEEN ${spherexBounds.decMin} AND ${spherexBounds.decMax}${spherexBounds.raCondition}`;
-            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, parallax, parallax_error, phot_g_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} ORDER BY random_index`;
+            const spherexQuery = `SELECT TOP 20 s_ra, s_dec, obs_id, obs_collection, t_min, t_max FROM spherex.obscore WHERE obs_collection = '${appState.collection}' AND s_dec BETWEEN ${spherexBounds.decMin} AND ${spherexBounds.decMax}${spherexBounds.raCondition}`;
+            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} ORDER BY random_index`;
             const simbadQuery = `SELECT TOP 500 b.oid, b.main_id, i.id, b.ra, b.dec, b.plx_value, b.plx_err, b.sp_type FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE 1=CONTAINS(POINT('ICRS', b.ra, b.dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radius})) AND b.sp_type IS NOT NULL AND i.id LIKE 'NAME %'`;
 
-            loadBackgroundCatalog('SPHEREx', spherexQuery, parseSpherexResponse, requestId, window.spherexAPI.queryTAP, { ra, dec, radius });
-            loadBackgroundCatalog('Gaia DR3', gaiaQuery, parseGaiaResponse, requestId, window.spherexAPI.queryGaia, { ra, dec, radius });
-            loadBackgroundCatalog('SIMBAD', simbadQuery, parseSimbadNamedStars, requestId, window.spherexAPI.querySimbadNamedStars);
-            loadTargetMotion(appState.currentTarget, requestId);
+            if (supportsGaiaProperMotion(appState.currentTarget)) {
+                appState.targetMotionState = 'loading';
+            } else {
+                appState.targetMotionState = 'unavailable';
+            }
+            setTimeout(() => {
+                if (requestId !== backgroundRequestId) return;
+                loadBackgroundCatalog('SPHEREx', spherexQuery, parseSpherexResponse, requestId, window.spherexAPI.queryTAP, { ra, dec, radius });
+                loadBackgroundCatalog('Gaia DR3', gaiaQuery, parseGaiaResponse, requestId, window.spherexAPI.queryGaia, { ra, dec, radius });
+                loadBackgroundCatalog('SIMBAD', simbadQuery, parseSimbadNamedStars, requestId, window.spherexAPI.querySimbadNamedStars);
+            }, 400);
         }
 
         function handleSearch() {
@@ -1162,6 +1512,14 @@
             appState.targetMotion = null;
             appState.targetMotionState = 'idle';
             appState.targetMotionError = '';
+            appState.spectrumSamples = [];
+            appState.spectrumState = 'idle';
+            appState.spectrumError = '';
+            appState.spectrumProgressMessage = '';
+            appState.spectrumFailures = [];
+            appState.spectrumAdditionalFailureCount = 0;
+            appState.spectrumProductCount = 0;
+            activeSpectrumRequestId = null;
             backgroundSourceStatus['Gaia DR3'] = 'idle';
             backgroundSourceStatus.SPHEREx = 'idle';
             backgroundSourceStatus.SIMBAD = 'idle';
@@ -1169,6 +1527,7 @@
             delete backgroundSourceErrors.SPHEREx;
             delete backgroundSourceErrors.SIMBAD;
             appState.realData = [];
+            renderSpectrum();
             updateBackgroundCatalogStatus();
             updateTimeline();
             plotStarAndSurroundings(obj);

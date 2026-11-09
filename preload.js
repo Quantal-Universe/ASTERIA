@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('spherexAPI', {
   // Existing Data API handlers
   searchSIA2: (params) => ipcRenderer.invoke('spherex:search-sia2', params),
   queryTAP: (params) => ipcRenderer.invoke('spherex:query-tap', params),
+  loadSpectrum: (params) => ipcRenderer.invoke('spherex:load-spectrum', params),
+  onSpectrumProgress: (callback) => ipcRenderer.on('spherex:spectrum-progress', (event, progress) => callback(progress)),
   queryGaia: (params) => ipcRenderer.invoke('spherex:query-gaia', params),
   querySimbadNamedStars: (params) => ipcRenderer.invoke('spherex:query-simbad-named-stars', params),
   resolveObject: (query) => ipcRenderer.invoke('spherex:resolve-object', query),
