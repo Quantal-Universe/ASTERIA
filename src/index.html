@@ -641,7 +641,7 @@
         function buildResearchContextPrompt() {
             const context = [
                 'You are a clear, helpful astronomy research assistant. Answer accurately and concisely. If uncertain, say so.',
-                'Use the active target/study context below to explain what the user is examining, what the available observations can help investigate, and the relevant details. Distinguish catalog facts from interpretation. Do not invent a formal study title, hypothesis, results, object properties, or observational data that are not supplied. If no target is selected, say that and invite the user to select one.'
+                'Ground claims in the supplied context and catalog rows. Never invent study sample sizes, class counts, object properties, cross-matches, or external checks. Counts from the app are only from its limited Gaia query result, not a complete COSMOS census or formal study sample. Gaia classifier outputs are probabilities/candidates, not definitive identifications. When a Gaia DR3 ID is mentioned, use its matching supplied row; if no row is supplied, say the app cannot verify it from loaded data and do not guess. Distinguish user claims from verified catalog facts. If no target is selected, say so.'
             ];
             const target = appState.currentTarget;
             if (!target) {
@@ -660,6 +660,11 @@
             if (target.isField) {
                 targetDetails.push('This selection is a survey field, not a single celestial object.');
             }
+            if (target.source === 'Gaia DR3') {
+                targetDetails.push(
+                    `Selected Gaia DR3 row: source_id=${target.name}; app classifier label=${target.classification || target.type || 'unavailable'}; class probabilities=${JSON.stringify(target.classProbabilities || {})}; G/BP/RP=${[target.mag, target.bpMag, target.rpMag].map(value => Number.isFinite(value) ? value : 'unavailable').join('/')}; parallax=${Number.isFinite(target.parallaxMas) ? `${target.parallaxMas} mas` : 'unavailable'}; proper motion=${Number.isFinite(target.pmra) && Number.isFinite(target.pmdec) ? `${target.pmra}, ${target.pmdec} mas/yr` : 'unavailable'}. Probabilities describe Gaia's classifier output, not spectroscopic confirmation.`
+                );
+            }
 
             const epochs = appState.observationEpochs;
             const observationCount = epochs.reduce((total, epoch) => total + epoch.observations, 0);
@@ -677,8 +682,23 @@
             const gaiaGalaxies = gaiaSources.filter(source => source.catalogClass === 'Galaxy').length;
             const gaiaQuasars = gaiaSources.filter(source => source.catalogClass === 'Quasar').length;
             targetDetails.push(
-                `Gaia DR3 sources currently loaded in the field: ${gaiaSources.length} (${gaiaStars} star candidates, ${gaiaGalaxies} galaxy candidates, ${gaiaQuasars} quasar candidates; classifier labels are candidates, not definitive identifications).`
+                `Gaia DR3 rows currently loaded: ${gaiaSources.length} (${gaiaStars} star candidates, ${gaiaGalaxies} galaxy candidates, ${gaiaQuasars} quasar candidates). These are counts in the app's returned query subset only: it requests at most 500 rows ordered by random_index from a rectangular coordinate bound, then filters those rows to ${backgroundRadiusDegrees}° in the renderer. This is not a complete field census or a study sample size. Classifier probabilities are not definitive identifications.`
             );
+            const mentionedGaiaIds = [...new Set(
+                appState.chatMessages
+                    .filter(message => message.role === 'user')
+                    .flatMap(message => message.content.match(/\b\d{15,20}\b/g) || [])
+            )].slice(-5);
+            for (const sourceId of mentionedGaiaIds) {
+                const source = gaiaSources.find(item => item.name === sourceId);
+                if (!source) {
+                    targetDetails.push(`Gaia DR3 ${sourceId} was mentioned in the conversation but is not present in the currently loaded Gaia query subset; its identity/classification is not verified by this app context.`);
+                    continue;
+                }
+                targetDetails.push(
+                    `Loaded Gaia DR3 row ${sourceId}: RA=${source.ra}°, Dec=${source.dec}°; app classifier label=${source.classification}; probabilities=${JSON.stringify(source.classProbabilities)}; G/BP/RP=${[source.mag, source.bpMag, source.rpMag].map(value => Number.isFinite(value) ? value : 'unavailable').join('/')}; parallax=${Number.isFinite(source.parallaxMas) ? `${source.parallaxMas} mas` : 'unavailable'}; proper motion=${Number.isFinite(source.pmra) && Number.isFinite(source.pmdec) ? `${source.pmra}, ${source.pmdec} mas/yr` : 'unavailable'}. This is Gaia DR3 catalog data, not spectroscopic confirmation.`
+                );
+            }
             targetDetails.push(`SIMBAD named-star references currently loaded: ${appState.realData.filter(source => source.source === 'SIMBAD').length}.`);
             targetDetails.push('SPHEREx rows are observation footprints, not per-object detections or classifications. The app has not supplied a formal proposal or hypothesis; explain study purpose as a reasonable interpretation of the selected target and available data, and label it as such.');
             if (appState.spectrumState === 'loading') {
@@ -1073,6 +1093,8 @@
             const decIndex = columnIndexes.dec;
             const idIndex = columnIndexes.source_id;
             const magnitudeIndex = columnIndexes.phot_g_mean_mag;
+            const bpMagnitudeIndex = columnIndexes.phot_bp_mean_mag;
+            const rpMagnitudeIndex = columnIndexes.phot_rp_mean_mag;
             const parallaxIndex = columnIndexes.parallax;
             const parallaxErrorIndex = columnIndexes.parallax_error;
             const starProbabilityIndex = columnIndexes.classprob_dsc_combmod_star;
@@ -1140,8 +1162,15 @@
                     catalogClass,
                     source: 'Gaia DR3',
                     name: String(row[idIndex]),
+                    classProbabilities: {
+                        star: numberAt(row, starProbabilityIndex),
+                        galaxy: numberAt(row, galaxyProbabilityIndex),
+                        quasar: numberAt(row, quasarProbabilityIndex)
+                    },
                     parallaxMas: numberAt(row, parallaxIndex),
                     parallaxErrorMas: numberAt(row, parallaxErrorIndex),
+                    bpMag: numberAt(row, bpMagnitudeIndex),
+                    rpMag: numberAt(row, rpMagnitudeIndex),
                     pmra: numberAt(row, pmraIndex),
                     pmdec: numberAt(row, pmdecIndex),
                     refEpoch: numberAt(row, refEpochIndex),
@@ -1427,7 +1456,7 @@
             const spherexBounds = getConeSearchBounds(ra, dec, radius, 's_ra');
             const gaiaBounds = getConeSearchBounds(ra, dec, radius);
             const spherexQuery = `SELECT TOP 20 s_ra, s_dec, obs_id, obs_collection, t_min, t_max FROM spherex.obscore WHERE obs_collection = '${appState.collection}' AND s_dec BETWEEN ${spherexBounds.decMin} AND ${spherexBounds.decMax}${spherexBounds.raCondition}`;
-            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} ORDER BY random_index`;
+            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} ORDER BY random_index`;
             const simbadQuery = `SELECT TOP 500 b.oid, b.main_id, i.id, b.ra, b.dec, b.plx_value, b.plx_err, b.sp_type FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE 1=CONTAINS(POINT('ICRS', b.ra, b.dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radius})) AND b.sp_type IS NOT NULL AND i.id LIKE 'NAME %'`;
 
             if (supportsGaiaProperMotion(appState.currentTarget)) {

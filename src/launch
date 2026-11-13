@@ -1,0 +1,9 @@
+#!/bin/bash
+# ASTERIA Launch Command Wrapper
+# Ensures the environment is set up and launches the app directly.
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "$DIR"
+
+# Run setup/launch
+bash launch.sh --auto-launch

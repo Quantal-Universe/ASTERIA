@@ -289,7 +289,7 @@ ipcMain.handle('call-openrouter-api', async (event, { messages, model, systemPro
   try {
     const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
       model: model || 'deepseek/deepseek-chat',
-      messages: [...(systemPrompt ? [{ role: 'system', content: systemPrompt.slice(0, 2000) }] : []), ...safeMessages],
+      messages: [...(systemPrompt ? [{ role: 'system', content: systemPrompt.slice(0, 10000) }] : []), ...safeMessages],
       max_tokens: responseTokenLimit,
       temperature: 0.3
     }, {
