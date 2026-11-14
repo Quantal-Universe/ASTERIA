@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>SPHEREx Sky Viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <!-- Inline styles from layout.html -->
+    <style>
+        :root{--bg:#f3f5f9;--card:#fff;--ink:#1c2540;--mute:#667089;--line:#e4e8f0;--acc:#4f46e5;--accs:#eceafd;--sh:0 1px 3px rgba(28,37,64,.07),0 8px 24px rgba(28,37,64,.05);--sky:#0b1020;color-scheme:light;box-sizing:border-box}
+        @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1120;--card:#161c30;--ink:#e8ecf8;--mute:#98a2bf;--line:#263050;--acc:#8b87ff;--accs:#26264d;--sh:0 1px 3px rgba(0,0,0,.4);color-scheme:dark}}
+        :root[data-theme="dark"]{--bg:#0d1120;--card:#161c30;--ink:#e8ecf8;--mute:#98a2bf;--line:#263050;--acc:#8b87ff;--accs:#26264d;--sh:0 1px 3px rgba(0,0,0,.4);color-scheme:dark}
+        *{box-sizing:border-box}html,body{height:100%;margin:0}
+        body{background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif;font-size:15px}
+        #app{display:grid;grid-template-columns:35% minmax(0,1fr) 64px;height:100%;gap:16px;padding:16px}
+        .panel{background:var(--card);border-radius:20px;box-shadow:var(--sh);border:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+        .scroll{overflow-y:auto;padding:16px;flex:1}
+        .head{padding:18px}.brand{font-size:24px;font-weight:800;margin:0 0 12px}
+        .search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:8px 16px;background:var(--bg)}
+        .search input{flex:1;border:0;background:none;outline:0}
+        .card{border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;gap:12px;cursor:pointer;background:var(--card);margin-bottom:8px;width:100%}
+        .card:hover{border-color:var(--acc)}
+        .detail{padding:24px;overflow-y:auto}
+        .hide{display:none!important}
+        .view{background:var(--sky);border-radius:16px;aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+        canvas{max-width:100%}
+        .rail{align-items:center;padding:12px 8px;gap:6px}
+        .rb{width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:none;color:var(--mute);padding:12px 4px;border-radius:14px;font:inherit;font-size:12px;cursor:pointer}
+        .rb:hover{background:var(--bg)}.rb.on{background:var(--accs);color:var(--acc)}
+    </style>
+</head>
+<body>
+    <div id="app">
+        <aside class="panel" id="left">
+            <div class="head">
+                <h1 class="brand">SPHEREx</h1>
+                <label class="search"><input id="q" placeholder="Search targets..."></label>
+            </div>
+            <div class="scroll" id="results"></div>
+        </aside>
+        
+        <main class="panel" id="main">
+            <div class="detail" id="detail">
+                <h2>Select a target</h2>
+                <p>Search for SPHEREx mission targets to view spectral data and images.</p>
+            </div>
+        </main>
+
+        <nav class="panel rail" id="rail">
+            <button class="rb" onclick="toggleTheme()" title="Toggle theme">Theme</button>
+        </nav>
+    </div>
+
+    <script>
+        const $=s=>document.querySelector(s);
+        const TARGETS=[
+            {n:"Barnard's Star",ra:269.452,dec:4.693,t:"Red Dwarf",d:"High-proper-motion star."},
+            {n:"WISE 0855-0714",ra:133.795,dec:-7.245,t:"Brown Dwarf",d:"Fast-moving, very cold brown dwarf."},
+            {n:"COSMOS Field",ra:150.119,dec:2.2058,t:"Extragalactic",d:"Deep survey field."}
+        ];
+
+        function list(){
+            const q=$("#q").value.toLowerCase();
+            const res=$("#results");
+            res.innerHTML="";
+            TARGETS.filter(t=>t.n.toLowerCase().includes(q)).forEach(t=>{
+                const c=document.createElement("button");
+                c.className="card";
+                c.innerHTML=`<div><b>${t.n}</b><small>${t.t}</small></div>`;
+                c.onclick=()=>detail(t);
+                res.append(c);
+            });
+        }
+
+        async function detail(t){
+            const el=$("#detail");
+            el.innerHTML=`<h2>${t.n}</h2>
+                <div class="view"><img id="img" src="" alt="SPHEREx Data" style="max-width:100%"></div>
+                <p>${t.d}</p>
+                <dl><dt>RA</dt><dd>${t.ra}</dd><dt>Dec</dt><dd>${t.dec}</dd></dl>`;
+            
+            // Native Electron API call
+            if(window.spherexAPI){
+                const res=await window.spherexAPI.searchSIA2({ra:t.ra, dec:t.dec});
+                if(res.imageUrl) $("#img").src=res.imageUrl;
+            }
+        }
+
+        function toggleTheme(){
+            document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+        }
+
+        $("#q").oninput=list;
+        list();
+    </script>
+</body>
+</html>

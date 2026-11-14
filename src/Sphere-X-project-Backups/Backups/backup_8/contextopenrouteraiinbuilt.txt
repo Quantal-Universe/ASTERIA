@@ -1,0 +1,12 @@
+
+
+
+ok the quazar stuff is acutal like it is no fake  right additionally **No, a quasar itself cannot be a uniform temperature of 6,734 Kelvin (K)**, because quasars are not single objects with a static temperature. Rather, they are dynamic galactic cores powered by supermassive black holes surrounded by massive swirling accretion disks. [](https://www.space.com/17262-quasar-definition.html)Space +1
+
+However, **parts of a quasar's outer accretion disk can easily pass through 6,734 K** as the gas cools farther away from the central black hole. [](https://astronomy.stackexchange.com/questions/35436/what-is-the-actual-temperature-of-a-quasar)Astronomy Stack Exchange +1
+
+Why a Quasar's Temperature is Vastly Different
+
+If you are looking at a specific astronomical measurement or stellar object with an effective temperature of 6,734 K, **you are likely looking at a star** (specifically an F-type main-sequence star, which typically ranges from 6,000 K to 7,600 K) rather than a quasar. In fact, early automated sky surveys frequently misclassified record-breaking, ultra-luminous quasars as nearby stars because their collective light profiles can trick machine-learning models. [](https://www.eso.org/public/news/eso2402/)Eso.org
+
+Are you looking at a **specific star catalog ID** or a particular **astronomical dataset**? If you share the name or coordinates, I can help you verify what kind of celestial object it so it is incorrect or something and also add one omre thing like a trapezoid for landmark stars, for an example if ther is something on the north next to polaris then soemthinfg iwll show, if it is soemthing for the cosmos deep field then for cosmos dep field **Alpha Sextantis (α Sextantis)** is the brightest star in the constellation Sextans (with a magnitude of about 4.49), sitting near the celestial equator, though it is not a landmark star physically inside the small deep-field patch itself but it shouldn't be hardcodede this data should come and hsoukd be placed inthe correct osition for each data you know so make these chnages i2wthout rdeleting or removing anything else

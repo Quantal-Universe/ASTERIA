@@ -2,6 +2,7 @@
 # Universal ASTERIA Research Tool Launcher for macOS & Linux (Unix Based)
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR"
+unset ELECTRON_RUN_AS_NODE
 
 # Ensure Node 24 via nvm if available
 if [ -s "$HOME/.nvm/nvm.sh" ]; then
@@ -10,10 +11,18 @@ if [ -s "$HOME/.nvm/nvm.sh" ]; then
     nvm use 24
 fi
 
-# Ensure local dependencies are installed
-if [ ! -d "node_modules" ]; then
+# Ensure Electron and its application dependencies are installed.
+if [ ! -x "./node_modules/.bin/electron" ]; then
     echo "📦 Installing dependencies locally..."
-    npm install
+    if ! npm install; then
+        echo "❌ Dependency installation failed."
+        exit 1
+    fi
+fi
+
+if [ ! -x "./node_modules/.bin/electron" ]; then
+    echo "❌ Electron is not installed. Check the npm install output and try again."
+    exit 1
 fi
 
 # Determine runtime
@@ -27,7 +36,7 @@ fi
 # Check for auto-launch flag
 if [ "$1" == "--auto-launch" ]; then
     echo "🚀 Launching ASTERIA..."
-    $RUNTIME main.js
+    ./node_modules/.bin/electron .
     exit 0
 fi
 
@@ -87,6 +96,14 @@ while true; do
             printf "║ %-57s ║\n" "Image Analysis (ASTERIA) is a time-domain research tool."
             printf "║ %-57s ║\n" "Use 'log' to start the engine and stream live output."
             printf "╠───────────────────────────────────────────────────────────╣\n"
+            ;;
+
+        launch)
+            printf "╠───────────────────────────────────────────────────────────╣\n"
+            printf "║ %-57s ║\n" "Launching ASTERIA manually..."
+            printf "╚═══════════════════════════════════════════════════════════╝\n"
+            ./node_modules/.bin/electron .
+            exit 0
             ;;
 
         log|logging)

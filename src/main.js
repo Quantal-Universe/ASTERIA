@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const { exec } = require('child_process');
 const http = require('http');
+const { SPHEREX_RELEASES, getReleaseFallback } = require('./spherex-data');
 
 let activeGaiaTapRequest = null;
 
@@ -36,9 +37,23 @@ async function abortGaiaTapJob(jobUrl) {
   }
 }
 
-// Fix: check if it's the class or a module wrapper
+// Fix: check if it's the class or a module wrapper and provide fallback
 const StoreClass = typeof Store === 'function' ? Store : (Store.default || Store.Store || Store);
-const store = new StoreClass();
+let store;
+try {
+  const storeCwd = (app && typeof app.getPath === 'function' && app.isReady())
+    ? app.getPath('userData')
+    : path.join(os.homedir(), '.asteria-store');
+  store = new StoreClass({ cwd: storeCwd });
+} catch (error) {
+  console.warn('[Store] Falling back to memory store:', error.message);
+  store = {
+    _data: {},
+    get(k) { return this._data[k]; },
+    set(k, v) { this._data[k] = v; },
+    delete(k) { delete this._data[k]; }
+  };
+}
 
 function getSessionFilePath() {
   return path.join(app.getPath('userData'), 'session.bin');
@@ -211,11 +226,28 @@ function createWindow() {
 // Simple HTTP/HTTPS fetch helper using Node/Electron net API
 async function fetchURL(targetUrl, options = {}) {
   return new Promise((resolve, reject) => {
+    const timeoutMs = options.timeout || 8000;
+    let timer = null;
+    let finished = false;
+
     const request = net.request({
       url: targetUrl,
       method: options.method || 'GET',
       headers: options.headers || {}
     });
+
+    const cleanup = () => {
+      finished = true;
+      if (timer) clearTimeout(timer);
+    };
+
+    timer = setTimeout(() => {
+      if (!finished) {
+        cleanup();
+        try { request.abort(); } catch (e) {}
+        reject(new Error(`Request timed out after ${timeoutMs}ms: ${targetUrl}`));
+      }
+    }, timeoutMs);
 
     let body = '';
     request.on('response', (response) => {
@@ -223,16 +255,23 @@ async function fetchURL(targetUrl, options = {}) {
         body += chunk.toString('utf8');
       });
       response.on('end', () => {
+        cleanup();
         resolve({
           status: response.statusCode,
           headers: response.headers,
           data: body
         });
       });
-      response.on('error', (err) => reject(err));
+      response.on('error', (err) => {
+        cleanup();
+        reject(err);
+      });
     });
 
-    request.on('error', (err) => reject(err));
+    request.on('error', (err) => {
+      cleanup();
+      reject(err);
+    });
 
     if (options.body) {
       request.write(options.body);
@@ -327,7 +366,7 @@ ipcMain.handle('open-external', async (event, url) => {
 // ------------------------------------------------------------------
 
 // 1. SIA2 Web Service API (Simple Image Access v2)
-ipcMain.handle('spherex:search-sia2', async (event, { collection = 'spherex_qr3', ra = 150.119, dec = 2.2058, radius = 0.1 }) => {
+ipcMain.handle('spherex:search-sia2', async (event, { collection = 'spherex_dr1', ra = 150.119, dec = 2.2058, radius = 0.1 }) => {
   try {
     const url = `https://irsa.ipac.caltech.edu/SIA?COLLECTION=${encodeURIComponent(collection)}&POS=CIRCLE+${ra}+${dec}+${radius}&FORMAT=ALL`;
     console.log(`[SIA2 API Request] ${url}`);
@@ -798,10 +837,13 @@ async function extractSpherexPixelSpectrum(product, ra, dec, motion) {
   };
 }
 
-ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, requestId }) => {
+ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, collection = 'spherex_dr1', requestId }) => {
   try {
     if (!Number.isFinite(ra) || ra < 0 || ra > 360 || !Number.isFinite(dec) || dec < -90 || dec > 90) {
       throw new Error('A valid sky coordinate is required to load SPHEREx spectra.');
+    }
+    if (!SPHEREX_RELEASES.includes(collection)) {
+      throw new Error('Unsupported SPHEREx data release.');
     }
     if (motion && ['ra', 'dec', 'pmra', 'pmdec', 'refEpoch'].some(key => !Number.isFinite(motion[key]))) {
       throw new Error('Gaia proper-motion data for the target is incomplete.');
@@ -812,8 +854,8 @@ ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, 
       }
     };
 
-    const queryProducts = async detector => {
-      const adqlQuery = `SELECT TOP 17 o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = 'spherex_qr2' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${ra}, ${dec}), p.poly) ORDER BY p.time_bounds_lower DESC`;
+    const queryProducts = async (detector, release) => {
+      const adqlQuery = `SELECT TOP 17 o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = '${release}' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${ra}, ${dec}), p.poly) ORDER BY p.time_bounds_lower DESC`;
       const params = new URLSearchParams({
         REQUEST: 'doQuery',
         LANG: 'ADQL',
@@ -846,32 +888,39 @@ ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, 
       });
     };
 
-    const detectorResults = [];
-    let completedDetectors = 0;
-    reportProgress({ phase: 'search', completedDetectors, totalDetectors: 6 });
-    for (const detector of ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']) {
-      try {
-        detectorResults.push({ detector, products: await queryProducts(detector) });
-      } catch (error) {
-        if (!isRetryableSpectrumError(error)) {
-          detectorResults.push({ detector, error: error.message });
-          continue;
-        }
-        await new Promise(resolve => setTimeout(resolve, 350));
+    let detectorResults = [];
+    const releases = [collection, getReleaseFallback(collection)];
+    for (const release of releases) {
+      const releaseResults = [];
+      let completedDetectors = 0;
+      reportProgress({ phase: 'search', collection: release, completedDetectors, totalDetectors: 6 });
+      for (const detector of ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']) {
         try {
-          detectorResults.push({ detector, products: await queryProducts(detector) });
-        } catch (retryError) {
-          detectorResults.push({ detector, error: retryError.message });
+          releaseResults.push({ detector, products: await queryProducts(detector, release) });
+        } catch (error) {
+          if (!isRetryableSpectrumError(error)) {
+            releaseResults.push({ detector, error: error.message });
+          } else {
+            await new Promise(resolve => setTimeout(resolve, 350));
+            try {
+              releaseResults.push({ detector, products: await queryProducts(detector, release) });
+            } catch (retryError) {
+              releaseResults.push({ detector, error: retryError.message });
+            }
+          }
         }
+        completedDetectors += 1;
+        reportProgress({
+          phase: 'search',
+          collection: release,
+          completedDetectors,
+          totalDetectors: 6,
+          detector,
+          productCount: releaseResults.at(-1).products?.length || 0
+        });
       }
-      completedDetectors += 1;
-      reportProgress({
-        phase: 'search',
-        completedDetectors,
-        totalDetectors: 6,
-        detector,
-        productCount: detectorResults.at(-1).products?.length || 0
-      });
+      detectorResults = releaseResults;
+      if (releaseResults.some(result => result.products?.length)) break;
     }
     const products = detectorResults.flatMap(result => result.products || []);
     if (products.length === 0) {
@@ -880,7 +929,7 @@ ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, 
         success: false,
         error: queryErrors.length
           ? `SPHEREx spectrum searches failed (${queryErrors.join('; ')}).`
-          : 'No calibrated SPHEREx QR2 detector images cover this coordinate.'
+          : `No calibrated SPHEREx DR1 or QR3 detector images cover this coordinate. QR2 is no longer searchable in IRSA.`
       };
     }
 
@@ -937,6 +986,223 @@ ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, 
     };
   } catch (error) {
     console.error('[SPHEREx spectrum error]', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+const spherexCutoutCache = new Map();
+async function querySpherexCutoutProducts(ra, dec, detector, release, limit) {
+  const adqlQuery = `SELECT TOP ${limit} o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = '${release}' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${ra}, ${dec}), p.poly) ORDER BY p.time_bounds_lower`;
+  const params = new URLSearchParams({
+    REQUEST: 'doQuery',
+    LANG: 'ADQL',
+    FORMAT: 'json',
+    QUERY: adqlQuery
+  });
+  const response = await axios.post('https://irsa.ipac.caltech.edu/TAP/sync', params.toString(), {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'SPHEREx-Electron-Tool/1.0'
+    },
+    timeout: 45000
+  });
+  const payload = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+  const table = payload?.VOTABLE?.RESOURCE_ARRAY?.[0]?.TABLE;
+  const fields = table?.FIELD_ARRAY?.map(field => field['<xmlattr>']?.name);
+  const rows = table?.DATA?.TABLEDATA;
+  if (!fields || !rows) throw new Error('IRSA TAP response did not contain a detector-product table.');
+  return rows.map(row => {
+    const values = Object.fromEntries(fields.map((field, index) => [field, row[index]]));
+    return {
+      uri: values.uri,
+      contentlength: values.contentlength,
+      energyBandpass: values.energy_bandpassname,
+      observationId: values.observationid,
+      mjdStart: Number(values.time_bounds_lower),
+      mjdEnd: Number(values.time_bounds_upper),
+      collection: values.collection
+    };
+  });
+}
+
+async function extractSpherexImageCutout(product, ra, dec, motion, size = 64) {
+  const fileSize = Number(product.contentlength);
+  if (!Number.isSafeInteger(fileSize) || fileSize < 10000 || fileSize > 100 * 1024 * 1024) {
+    throw new Error('SPHEREx archive product has an invalid or unsupported file size.');
+  }
+  const url = new URL(product.uri, 'https://irsa.ipac.caltech.edu/');
+  if (url.hostname !== 'irsa.ipac.caltech.edu' || !url.pathname.startsWith('/ibe/data/spherex/')) {
+    throw new Error('SPHEREx archive returned an unexpected product URL.');
+  }
+  const headerResponse = await fetchFitsRange(url.toString(), [[0, 65535]]);
+  const primary = parseFitsHeaderAt(headerResponse.data);
+  const image = parseFitsHeaderAt(headerResponse.data, primary.nextOffset);
+  if (image.header.EXTNAME?.trim() !== 'IMAGE' || Number(image.header.NAXIS) !== 2
+      || Math.abs(Number(image.header.BITPIX)) !== 32 || image.header.BUNIT !== 'MJy / sr') {
+    throw new Error('SPHEREx product does not contain a supported 2-D science image.');
+  }
+  const { flagsHdu, varianceHdu } = await getSpectrumHduLayout(product, url.toString(), image);
+  const midpointMjd = (product.mjdStart + product.mjdEnd) / 2;
+  const trackedPosition = positionAtMjd(ra, dec, motion, midpointMjd);
+  const pixel = skyToFitsPixel(image.header, trackedPosition.ra, trackedPosition.dec);
+  const imageWidth = Number(image.header.NAXIS1);
+  const imageHeight = Number(image.header.NAXIS2);
+  const width = Math.min(size, imageWidth);
+  const height = Math.min(size, imageHeight);
+  const startX = Math.max(1, Math.min(imageWidth - width + 1, Math.round(pixel.x) - Math.floor(width / 2)));
+  const startY = Math.max(1, Math.min(imageHeight - height + 1, Math.round(pixel.y) - Math.floor(height / 2)));
+  if (pixel.x < 1 || pixel.x > imageWidth || pixel.y < 1 || pixel.y > imageHeight
+      || Number(flagsHdu.header.NAXIS1) !== imageWidth || Number(flagsHdu.header.NAXIS2) !== imageHeight
+      || Number(varianceHdu.header.NAXIS1) !== imageWidth || Number(varianceHdu.header.NAXIS2) !== imageHeight) {
+    throw new Error('Selected coordinate is outside the SPHEREx detector image.');
+  }
+
+  const imageRanges = [];
+  const flagsRanges = [];
+  for (let row = 0; row < height; row += 1) {
+    const firstPixel = (startY + row - 1) * imageWidth + startX - 1;
+    const imageStart = image.dataOffset + firstPixel * 4;
+    const flagsStart = flagsHdu.dataOffset + firstPixel * 4;
+    imageRanges.push([imageStart, imageStart + width * 4 - 1]);
+    flagsRanges.push([flagsStart, flagsStart + width * 4 - 1]);
+  }
+  const waveTailStart = fileSize - 5760;
+  const waveTailRange = [waveTailStart, fileSize - 1];
+  const ranges = [...imageRanges.flatMap((range, index) => [range, flagsRanges[index]]), waveTailRange];
+  const cutoutResponse = await fetchFitsRange(url.toString(), ranges);
+  const rangeData = parseMultipartRanges(cutoutResponse.data, cutoutResponse.contentType, ranges);
+  const pixels = new Array(width * height);
+  const flags = new Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    const imageRow = rangeData.get(imageRanges[y][0]);
+    const flagsRow = rangeData.get(flagsRanges[y][0]);
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      pixels[index] = imageRow.readFloatBE(x * 4) * Number(image.header.BSCALE ?? 1)
+        + Number(image.header.BZERO ?? 0);
+      flags[index] = flagsRow.readInt32BE(x * 4);
+    }
+  }
+  const lookup = readWavelengthLookup(rangeData.get(waveTailStart));
+  const wavelength = interpolateWavelength(lookup, Math.round(pixel.x), Math.round(pixel.y));
+  const cdelt1 = Number(image.header.CDELT1 ?? 1);
+  const cdelt2 = Number(image.header.CDELT2 ?? 1);
+  const cdMatrix = [
+    [Number(image.header.CD1_1 ?? cdelt1 * Number(image.header.PC1_1 ?? 1)),
+      Number(image.header.CD1_2 ?? cdelt1 * Number(image.header.PC1_2 ?? 0))],
+    [Number(image.header.CD2_1 ?? cdelt2 * Number(image.header.PC2_1 ?? 0)),
+      Number(image.header.CD2_2 ?? cdelt2 * Number(image.header.PC2_2 ?? 1))]
+  ];
+  const pixelScaleDegrees = Math.sqrt(Math.abs(cdMatrix[0][0] * cdMatrix[1][1] - cdMatrix[0][1] * cdMatrix[1][0]));
+  if (!Number.isFinite(pixelScaleDegrees) || pixelScaleDegrees <= 0) {
+    throw new Error('SPHEREx image is missing a valid pixel scale.');
+  }
+  return {
+    width,
+    height,
+    pixels,
+    flags,
+    centerRa: trackedPosition.ra,
+    centerDec: trackedPosition.dec,
+    centerX: pixel.x - startX,
+    centerY: pixel.y - startY,
+    cdMatrix,
+    pixelScaleArcsec: pixelScaleDegrees * 3600,
+    detector: String(product.energyBandpass).replace('SPHEREx-', ''),
+    wavelengthUm: wavelength.wavelengthUm,
+    bandwidthUm: wavelength.bandwidthUm,
+    observationId: product.observationId,
+    timestamp: ((midpointMjd - 40587) * 86400000),
+    exposureSeconds: Math.max(0, (product.mjdEnd - product.mjdStart) * 86400),
+    collection: product.collection
+  };
+}
+
+ipcMain.handle('spherex:load-cutouts', async (event, {
+  ra, dec, motion = null, collection = 'spherex_dr1', detector = 'D1', frameLimit = 8, requestId
+}) => {
+  try {
+    if (!Number.isFinite(ra) || ra < 0 || ra >= 360 || !Number.isFinite(dec) || dec < -90 || dec > 90) {
+      throw new Error('A valid sky coordinate is required to load SPHEREx cutouts.');
+    }
+    if (!SPHEREX_RELEASES.includes(collection)) throw new Error('Unsupported SPHEREx data release.');
+    if (detector !== 'all' && !/^D[1-6]$/.test(detector)) {
+      throw new Error('Choose all detector arrays or a SPHEREx detector from D1 to D6.');
+    }
+    if (!Number.isInteger(frameLimit) || frameLimit < 2 || frameLimit > 12) {
+      throw new Error('The cutout frame limit must be from 2 to 12.');
+    }
+    if (motion && ['ra', 'dec', 'pmra', 'pmdec', 'refEpoch'].some(key => !Number.isFinite(motion[key]))) {
+      throw new Error('Gaia proper-motion data for the target is incomplete.');
+    }
+
+    const cacheKey = [ra.toFixed(7), dec.toFixed(7), detector, collection, frameLimit,
+      ...(motion ? [motion.pmra, motion.pmdec, motion.refEpoch] : [])].join(':');
+    const cached = spherexCutoutCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return { success: true, ...cached.result, cached: true };
+
+    const releases = [collection, getReleaseFallback(collection)];
+    let products = [];
+    const failures = [];
+    for (const release of releases) {
+      try {
+        const detectors = detector === 'all' ? ['D1', 'D2', 'D3', 'D4', 'D5', 'D6'] : [detector];
+        const productsByDetector = [];
+        for (const detectorName of detectors) {
+          try {
+            const detectorLimit = detector === 'all' ? Math.min(2, frameLimit) : frameLimit;
+            productsByDetector.push(...await querySpherexCutoutProducts(ra, dec, detectorName, release, detectorLimit));
+          } catch (error) {
+            failures.push(`${detectorName} ${release}: ${error.message}`);
+          }
+        }
+        products = productsByDetector;
+        if (products.length) break;
+      } catch (error) {
+        failures.push(`${release}: ${error.message}`);
+      }
+    }
+    if (!products.length) {
+      return {
+        success: false,
+        error: failures.length
+          ? `SPHEREx image search failed: ${failures.join('; ')}`
+          : `No calibrated SPHEREx ${detector} cutouts cover this coordinate in DR1 or QR3. QR2 is no longer searchable in IRSA.`
+      };
+    }
+
+    const frames = [];
+    for (const product of products) {
+      try {
+        frames.push(await extractSpherexImageCutout(product, ra, dec, motion));
+        if (typeof event.sender?.send === 'function' && !event.sender.isDestroyed?.()) {
+          event.sender.send('spherex:cutout-progress', {
+            requestId,
+            completed: frames.length,
+            total: products.length,
+            observationId: product.observationId
+          });
+        }
+      } catch (error) {
+        failures.push(`${product.observationId}: ${error.message}`);
+      }
+    }
+    frames.sort((a, b) => a.timestamp - b.timestamp);
+    if (!frames.length) {
+      throw new Error(`No SPHEREx image cutouts could be read. ${failures.slice(0, 3).join('; ')}`);
+    }
+
+    const result = {
+      frames,
+      productCount: products.length,
+      failures: failures.slice(0, 8),
+      additionalFailureCount: Math.max(0, failures.length - 8)
+    };
+    spherexCutoutCache.set(cacheKey, { result, expiresAt: Date.now() + 10 * 60 * 1000 });
+    while (spherexCutoutCache.size > 6) spherexCutoutCache.delete(spherexCutoutCache.keys().next().value);
+    return { success: true, ...result, cached: false };
+  } catch (error) {
+    console.error('[SPHEREx cutout error]', error.message);
     return { success: false, error: error.message };
   }
 });
@@ -1147,11 +1413,16 @@ ipcMain.handle('spherex:resolve-object', async (event, query) => {
       };
     }
 
-    // CDS Sesame Resolver
+    // CDS Sesame Resolver with strict 3.5s timeout
     const url = `https://cds.unistra.fr/cgi-bin/nph-sesame/-I?${encodeURIComponent(trimmed)}`;
-    const res = await fetchURL(url);
+    let res = null;
+    try {
+      res = await fetchURL(url, { timeout: 3500 });
+    } catch (e) {
+      // CDS Sesame timed out or unreachable
+    }
 
-    if (res.data) {
+    if (res && res.data) {
       // Parse RA / Dec from Sesame response
       const raMatch = res.data.match(/%J\s+([0-9\.]+)\s+([+-]?[0-9\.]+)/);
       if (raMatch) {
@@ -1165,14 +1436,35 @@ ipcMain.handle('spherex:resolve-object', async (event, query) => {
       }
     }
 
-    // Fallback dictionary for popular SPHEREx targets
+    // Fallback dictionary for popular SPHEREx targets & celestial landmarks
     const knownTargets = {
       'cosmos': { ra: 150.119, dec: 2.2058, name: 'COSMOS Deep Field' },
       'm82': { ra: 148.968, dec: 69.679, name: 'M82 Starburst Core' },
       'orion': { ra: 83.822, dec: -5.391, name: 'Orion Nebula (M42)' },
       'pleiades': { ra: 56.75, dec: 24.116, name: 'Pleiades Cluster' },
       'crab': { ra: 83.633, dec: 22.014, name: 'Crab Nebula (M1)' },
-      'proxima': { ra: 217.429, dec: -62.679, name: 'Proxima Centauri' }
+      'proxima': { ra: 217.429, dec: -62.679, name: 'Proxima Centauri' },
+      'andromeda': { ra: 10.685, dec: 41.269, name: 'Andromeda Galaxy (M31)' },
+      'm31': { ra: 10.685, dec: 41.269, name: 'Andromeda Galaxy (M31)' },
+      'sombrero': { ra: 189.998, dec: -11.623, name: 'Sombrero Galaxy (M104)' },
+      'm104': { ra: 189.998, dec: -11.623, name: 'Sombrero Galaxy (M104)' },
+      'whirlpool': { ra: 202.470, dec: 47.195, name: 'Whirlpool Galaxy (M51)' },
+      'm51': { ra: 202.470, dec: 47.195, name: 'Whirlpool Galaxy (M51)' },
+      'triangulum': { ra: 23.462, dec: 30.660, name: 'Triangulum Galaxy (M33)' },
+      'm33': { ra: 23.462, dec: 30.660, name: 'Triangulum Galaxy (M33)' },
+      'centaurus': { ra: 201.365, dec: -43.019, name: 'Centaurus A (NGC 5128)' },
+      'trappist': { ra: 346.622, dec: -5.041, name: 'TRAPPIST-1 System' },
+      'sirius': { ra: 101.287, dec: -16.716, name: 'Sirius' },
+      'betelgeuse': { ra: 88.793, dec: 7.407, name: 'Betelgeuse' },
+      'vega': { ra: 279.235, dec: 38.784, name: 'Vega' },
+      'barnard': { ra: 269.452, dec: 4.693, name: "Barnard's Star" },
+      'wise': { ra: 133.795, dec: -7.245, name: 'WISE 0855-0714' },
+      'sagittarius': { ra: 266.417, dec: -29.008, name: 'Sagittarius A*' },
+      'sgr a': { ra: 266.417, dec: -29.008, name: 'Sagittarius A*' },
+      'cygnus': { ra: 299.590, dec: 35.202, name: 'Cygnus X-1' },
+      'nep': { ra: 270.000, dec: 66.561, name: 'North Ecliptic Pole (NEP)' },
+      'sep': { ra: 90.000, dec: -66.561, name: 'South Ecliptic Pole (SEP)' },
+      'galaxy': { ra: 10.685, dec: 41.269, name: 'Andromeda Galaxy (M31)' }
     };
 
     const key = trimmed.toLowerCase();

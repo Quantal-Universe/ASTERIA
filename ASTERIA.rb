@@ -1,18 +1,25 @@
 class Asteria < Formula
-  desc "NASA SPHEREx Sky Survey Time-Domain Research Tool"
-  homepage "https://example.com/asteria"
-  # URL needs to be updated to the actual repository/tarball source.
-  url "https://example.com/asteria-1.0.0.tar.gz"
-  sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # Placeholder
-
+  desc "ASTERIA Research Tool Astronomical SPHEREx Time-series Extraction & Rapid Image Analysis"
+  homepage "https://quantal-labs.com/asteria"
+  url "https://github.com/Quantal-Universe/ASTERIA/archive/refs/tags/v2.0.0.tar.gz"
+  sha256 "b2618ab6f7aa8956ba64d9fd1139ffa29ff5d5db3e822839970c54104dcb766f" 
+  
+  depends_on "node"
+  depends_on "simdjson"
+  
   def install
+    # Install dependencies inside src/
+    Dir.chdir("src") do
+      system "npm", "install"
+    end
+
     # Install all files into libexec
     libexec.install Dir["*"]
 
     # Create the wrapper script that runs launch.sh
     (bin/"ASTERIA").write <<~EOS
       #!/bin/bash
-      #{libexec}/launch.sh "$@"
+      #{libexec}/src/launch.sh "$@"
     EOS
   end
 
