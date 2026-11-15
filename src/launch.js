@@ -95,7 +95,11 @@ function startFallbackServer() {
     else if (platform === 'linux') startCmd = 'xdg-open';
 
     try {
-      execSync(`${startCmd} http://localhost:3000`);
+      const opener = process.platform === 'win32' ? 'cmd' : startCmd;
+      const openerArgs = process.platform === 'win32'
+        ? ['/c', 'start', '', 'http://localhost:3000']
+        : ['http://localhost:3000'];
+      spawn(opener, openerArgs, { stdio: 'ignore', detached: true }).unref();
     } catch (e) {
       console.log('Open http://localhost:3000 in your web browser.');
     }
@@ -108,10 +112,9 @@ function launchApp() {
 
   console.log('🚀 Launching SPHEREx Desktop App via Electron...\n');
 
-  const electronProcess = spawn('npx', ['electron', '.'], {
+  const electronProcess = spawn(process.execPath, [ELECTRON_CLI, '.'], {
     cwd: PROJECT_DIR,
-    stdio: 'inherit',
-    shell: true
+    stdio: 'inherit'
   });
 
   electronProcess.on('error', (err) => {

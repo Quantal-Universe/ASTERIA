@@ -9,10 +9,13 @@ This checklist describes the features present in the active `src` app. It distin
 - [x] Search preset targets, object names, target types, and coordinates from the dashboard.
 - [x] Debounced search, keyboard navigation of result choices, and clear-search control.
 - [x] Resolve names through astronomical name-resolution services.
+- [x] Populate the default browse list and name/type search from live SIMBAD TAP object-catalog rows (up to 60 per query); label catalog results and do not substitute preset examples when the online catalog is unavailable.
+- [x] Search SIMBAD identifiers and common object types including galaxies, quasars, nebulae, supernova remnants, stars, dwarfs, clusters, pulsars, and black holes.
 - [x] Parse decimal-degree and sexagesimal RA/Dec and validate coordinate ranges.
 - [x] Search the live SPHEREx IRSA TAP archive and show matching observation IDs and positions.
 - [x] Browse preset science targets, survey fields, and recent sky-map searches.
 - [x] Show a selected object's name, type, coordinates, distance estimate/description, archive coverage, and summary.
+- [x] Check live SPHEREx DR1/QR3 calibrated-image availability by detector array (D1–D6) for the selected coordinate and export the returned observation IDs, releases, bandpasses, and UTC/MJD dates to CSV.
 - [~] Search and archive results depend on network access and upstream catalog/archive availability.
 
 ## Detailed Sky Map
@@ -42,6 +45,7 @@ This checklist describes the features present in the active `src` app. It distin
 - [x] Load real image cutouts on request, with progress feedback and errors when no coverage or products are available.
 - [x] Choose a detector array (D1–D6) or request a sample across arrays; select among available wavelength bands.
 - [x] Play/pause, change playback speed, step frames, and scrub through loaded cutouts.
+- [x] Analyze loaded SPHEREx epochs per detector/band using clean-pixel centroid positions and local background-subtracted surface brightness; plot both trends and export the measured rows to CSV with quick-look limitations stated.
 - [x] Display frame date, wavelength/band, detector, exposure and release metadata when supplied by the archive.
 - [x] Zoom and pan the image, show the target crosshair, and inspect pixel values.
 - [x] Select brightness stretch (linear, log, asinh), palette, and quality-flag display behavior.
@@ -73,7 +77,7 @@ This checklist describes the features present in the active `src` app. It distin
 - [x] Show source hover information such as coordinates, source/catalog, magnitude, classification, and available motion/distance fields.
 - [x] Draw target surroundings and compare selected targets with available catalog sources.
 - [~] Catalog search regions and result counts are bounded; source classifications are candidates, not confirmations.
-- [~] Constellation labels use a simplified coordinate-region approximation.
+- [x] Identify constellation labels from bundled J2000 IAU boundary polygons, including regions crossing the 0°/360° RA seam; lookup works offline.
 
 ## Sharing, export, and onboarding
 
@@ -102,7 +106,7 @@ This checklist describes the features present in the active `src` app. It distin
 - [x] Provide user-facing handling for invalid input, unavailable catalogs, missing observations, and service errors.
 - [~] Aladin Lite, Tailwind, fonts, and icon assets are loaded from external CDNs; offline startup has reduced functionality.
 - [~] Validate the completed changes in a running Electron window; interactive app verification has not been performed in this coding session.
-- [ ] Publish a hosted public demo and record a short demo video; this requires a hosting destination and recording.
+- [ ] Publish a hosted public demo and record a short demo video; this is outside the app-feature checklist scope.
 
 ## Suggested end-to-end walkthrough
 

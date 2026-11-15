@@ -8,7 +8,7 @@ const { exec } = require('child_process');
 const http = require('http');
 const { SPHEREX_RELEASES, getReleaseFallback } = require('./spherex-data');
 
-let activeGaiaTapRequest = null;
+const activeGaiaTapRequests = new Map();
 
 function getRateLimitRetryDelay(response, attempt) {
   const retryAfter = response?.headers?.['retry-after'];
@@ -284,17 +284,126 @@ async function fetchURLWithRateLimitRetry(targetUrl, options) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const response = await fetchURL(targetUrl, options);
-      if (response.status !== 429 || attempt === 2) return response;
+      if (![429, 502, 503, 504].includes(response.status) || attempt === 2) return response;
       await new Promise(resolve => setTimeout(resolve, getRateLimitRetryDelay(response, attempt)));
     } catch (error) {
       const retryableNetworkError = /ERR_NAME_NOT_RESOLVED|ERR_CONNECTION_RESET|ERR_TIMED_OUT|EAI_AGAIN|ECONNRESET|ETIMEDOUT/.test(
         `${error.code || ''} ${error.message || ''}`
       );
-      if (!retryableNetworkError || attempt === 2) throw error;
+      if ((!retryableNetworkError && ![502, 503, 504].includes(error.response?.status)) || attempt === 2) throw error;
       await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
   throw new Error('Request retry loop ended unexpectedly.');
+}
+
+let irsaTapQueue = Promise.resolve();
+
+function queueIrsaTap(task) {
+  const pending = irsaTapQueue.then(task, task);
+  irsaTapQueue = pending.then(() => undefined, () => undefined);
+  return pending;
+}
+
+async function queryIrsaTapAsync(adqlQuery, { format = 'json', label = 'IRSA TAP' } = {}) {
+  const tapBase = 'https://irsa.ipac.caltech.edu/TAP';
+  const params = new URLSearchParams({
+    REQUEST: 'doQuery', LANG: 'ADQL', FORMAT: format, PHASE: 'RUN', QUERY: adqlQuery
+  });
+  const requestOptions = {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'SPHEREx-Electron-Tool/1.0'
+    },
+    maxRedirects: 0,
+    timeout: 30000,
+    responseType: 'text',
+    transformResponse: [data => data],
+    validateStatus: () => true
+  };
+  const submission = await axios.post(`${tapBase}/async`, params.toString(), requestOptions);
+  const location = submission.headers?.location;
+  if (![200, 201, 202, 302, 303].includes(submission.status) || !location) {
+    const detail = String(submission.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+    throw new Error(`${label} async job submission failed (HTTP ${submission.status})${detail ? `: ${detail}` : ''}`);
+  }
+  const jobUrl = new URL(location, `${tapBase}/`).toString();
+  const parsedJobUrl = new URL(jobUrl);
+  if (parsedJobUrl.origin !== 'https://irsa.ipac.caltech.edu'
+      || !parsedJobUrl.pathname.startsWith('/TAP/async/')) {
+    throw new Error(`${label} returned an invalid async job URL.`);
+  }
+
+  let completed = false;
+  let terminalError = '';
+  try {
+    let consecutiveGatewayErrors = 0;
+    for (let attempt = 0; attempt < 90; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const phaseResponse = await axios.get(`${jobUrl}/phase`, requestOptions);
+      if ([502, 503, 504].includes(phaseResponse.status)) {
+        consecutiveGatewayErrors += 1;
+        if (consecutiveGatewayErrors >= 6) {
+          throw new Error(`${label} job status endpoint repeatedly returned HTTP ${phaseResponse.status}.`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000 * consecutiveGatewayErrors));
+        continue;
+      }
+      if (phaseResponse.status === 429) {
+        await new Promise(resolve => setTimeout(resolve, getRateLimitRetryDelay(phaseResponse, Math.min(attempt, 4))));
+        continue;
+      }
+      if (phaseResponse.status < 200 || phaseResponse.status >= 300) {
+        throw new Error(`${label} job status failed (HTTP ${phaseResponse.status}).`);
+      }
+      consecutiveGatewayErrors = 0;
+      const phase = String(phaseResponse.data || '').trim().toUpperCase();
+      if (phase === 'COMPLETED') {
+        completed = true;
+        break;
+      }
+      if (['ERROR', 'ABORTED', 'ABORT'].includes(phase)) {
+        const detailResponse = await axios.get(`${jobUrl}/error`, requestOptions);
+        const detail = String(detailResponse.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+        throw new Error(`${label} job ${phase.toLowerCase()}${detail ? `: ${detail}` : ''}`);
+      }
+      if (!['PENDING', 'QUEUED', 'EXECUTING'].includes(phase)) {
+        throw new Error(`${label} returned an unexpected job phase: ${phase || 'empty response'}.`);
+      }
+    }
+    if (!completed) throw new Error(`${label} async job exceeded the 180-second wait limit.`);
+    let result;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      result = await axios.get(`${jobUrl}/results/result`, requestOptions);
+      if (![502, 503, 504].includes(result.status) || attempt === 2) break;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+    }
+    if (result.status < 200 || result.status >= 300) {
+      const detail = String(result.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+      throw new Error(`${label} result download failed (HTTP ${result.status})${detail ? `: ${detail}` : ''}`);
+    }
+    if (format.toLowerCase() === 'json' && typeof result.data === 'string') {
+      try { return JSON.parse(result.data); } catch (error) {
+        throw new Error(`${label} result was not valid JSON: ${error.message}`);
+      }
+    }
+    return result.data;
+  } catch (error) {
+    terminalError = error.message;
+    throw error;
+  } finally {
+    if (!completed) {
+      try {
+        await axios.post(`${jobUrl}/phase`, 'PHASE=ABORT', {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          timeout: 5000,
+          validateStatus: () => true
+        });
+      } catch (abortError) {
+        console.warn(`[${label}] Could not stop unfinished TAP job${terminalError ? ` after ${terminalError}` : ''}: ${abortError.message}`);
+      }
+    }
+  }
 }
 
 // --- AUTHENTICATION & AI HANDLERS ---
@@ -392,29 +501,9 @@ ipcMain.handle('spherex:search-sia2', async (event, { collection = 'spherex_dr1'
 // 2. Table Access Protocol (TAP) Metadata API
 ipcMain.handle('spherex:query-tap', async (event, { adqlQuery }) => {
   try {
-    const url = 'https://irsa.ipac.caltech.edu/TAP/sync';
-    const params = new URLSearchParams({
-      REQUEST: 'doQuery',
-      LANG: 'ADQL',
-      FORMAT: 'json',
-      QUERY: adqlQuery
-    });
-
     console.log(`[TAP API Request] ADQL: ${adqlQuery}`);
-    const res = await fetchURLWithRateLimitRetry(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'SPHEREx-Electron-Tool/1.0'
-      },
-      body: params.toString()
-    });
-
-    if (res.status >= 200 && res.status < 300) {
-      return { success: true, data: res.data };
-    } else {
-      return { success: false, status: res.status, error: 'TAP Query failed', raw: res.data };
-    }
+    const data = await queueIrsaTap(() => queryIrsaTapAsync(adqlQuery, { label: 'IRSA TAP' }));
+    return { success: true, data };
   } catch (err) {
     console.error('[TAP API Error]', err.message);
     return { success: false, error: err.message };
@@ -856,20 +945,7 @@ ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, 
 
     const queryProducts = async (detector, release) => {
       const adqlQuery = `SELECT TOP 17 o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = '${release}' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${ra}, ${dec}), p.poly) ORDER BY p.time_bounds_lower DESC`;
-      const params = new URLSearchParams({
-        REQUEST: 'doQuery',
-        LANG: 'ADQL',
-        FORMAT: 'json',
-        QUERY: adqlQuery
-      });
-      const response = await axios.post('https://irsa.ipac.caltech.edu/TAP/sync', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'SPHEREx-Electron-Tool/1.0'
-        },
-        timeout: 45000
-      });
-      const payload = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      const payload = await queueIrsaTap(() => queryIrsaTapAsync(adqlQuery, { label: `SPHEREx ${detector} ${release} spectrum search` }));
       const table = payload?.VOTABLE?.RESOURCE_ARRAY?.[0]?.TABLE;
       const fields = table?.FIELD_ARRAY?.map(field => field['<xmlattr>']?.name);
       const rows = table?.DATA?.TABLEDATA;
@@ -991,22 +1067,112 @@ ipcMain.handle('spherex:load-spectrum', async (event, { ra, dec, motion = null, 
 });
 
 const spherexCutoutCache = new Map();
-async function querySpherexCutoutProducts(ra, dec, detector, release, limit) {
-  const adqlQuery = `SELECT TOP ${limit} o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = '${release}' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${ra}, ${dec}), p.poly) ORDER BY p.time_bounds_lower`;
+function parseCsvRows(csvText) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let quoted = false;
+  const text = String(csvText || '').replace(/^\uFEFF/, '');
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quoted && char === '"' && text[index + 1] === '"') { field += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (!quoted && char === ',') { row.push(field); field = ''; }
+    else if (!quoted && (char === '\n' || char === '\r')) {
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      row.push(field); field = '';
+      if (row.some(value => value !== '')) rows.push(row);
+      row = [];
+    } else field += char;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const headers = rows.shift().map(value => value.trim().toLowerCase());
+  return rows.map(values => Object.fromEntries(headers.map((key, index) => [key, values[index] ?? ''])));
+}
+
+async function querySpherexCutoutProductsViaSia(ra, dec, detector, release, limit, motion = null) {
+  // Center the archive search on the target's expected 2026 position and widen
+  // it to cover the SPHEREx observing baseline. Each FITS cutout is then recentered
+  // on the propagated target position at that image's own epoch.
+  const searchEpochMjd = 61041;
+  const searchCenter = positionAtMjd(ra, dec, motion, searchEpochMjd);
+  const properMotionArcsecPerYear = motion ? Math.hypot(motion.pmra, motion.pmdec) : 0;
+  const searchRadiusDegrees = 0.01 + properMotionArcsecPerYear * 1.5 / 3600;
   const params = new URLSearchParams({
-    REQUEST: 'doQuery',
-    LANG: 'ADQL',
-    FORMAT: 'json',
-    QUERY: adqlQuery
+    COLLECTION: release,
+    POS: `CIRCLE ${searchCenter.ra} ${searchCenter.dec} ${searchRadiusDegrees}`,
+    CALIB: '2',
+    DPTYPE: 'image',
+    FORMAT: 'image/fits',
+    MAXREC: String(Math.max(24, limit * 8)),
+    RESPONSEFORMAT: 'CSV'
   });
-  const response = await axios.post('https://irsa.ipac.caltech.edu/TAP/sync', params.toString(), {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'SPHEREx-Electron-Tool/1.0'
-    },
-    timeout: 45000
+  const response = await axios.get(`https://irsa.ipac.caltech.edu/SIA?${params}`, {
+    timeout: 25000,
+    responseType: 'text',
+    transformResponse: [data => data],
+    validateStatus: () => true,
+    headers: { 'User-Agent': 'SPHEREx-Electron-Tool/1.0' }
   });
-  const payload = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`IRSA SIA2 image search failed (HTTP ${response.status}).`);
+  }
+  const rows = parseCsvRows(response.data);
+  if (!rows.length) throw new Error('IRSA SIA2 returned no image rows.');
+  const products = rows.filter(row => {
+    const band = String(row.energy_bandpassname || row.energy_band || row.bandpass || '').toUpperCase();
+    const format = String(row.access_format || '').toLowerCase();
+    const uri = row.access_url;
+    const matchesDetector = band
+      ? band.includes(`SPHEREX-${detector}`) || band.endsWith(detector)
+      : /_2D[1-6]_/.test(String(uri || '')) && String(uri).includes(`_2${detector}_`);
+    return uri && matchesDetector
+      && (!format || format.includes('fits'));
+  }).slice(0, limit);
+  const mapped = await Promise.all(products.map(async row => {
+    const uri = row.access_url;
+    const start = Number(row.t_min || row.time_bounds_lower);
+    const end = Number(row.t_max || row.time_bounds_upper || row.t_min || row.time_bounds_lower);
+    const band = row.energy_bandpassname || row.energy_band || row.bandpass || `SPHEREx-${detector}`;
+    try {
+      const head = await axios.head(uri, { timeout: 10000, maxRedirects: 5, validateStatus: () => true });
+      const contentlength = Number(head.headers?.['content-length'] || row.contentlength);
+      if (head.status < 200 || head.status >= 400 || !Number.isSafeInteger(contentlength)) return null;
+      return {
+        uri,
+        contentlength,
+        energyBandpass: band,
+        observationId: row.obs_id || row.observationid || row.obs_publisher_did || uri.split('/').pop().split('?')[0],
+        mjdStart: start,
+        mjdEnd: end,
+        collection: row.obs_collection || release
+      };
+    } catch (error) {
+      return null;
+    }
+  }));
+  return mapped.filter(product => product && Number.isFinite(product.mjdStart) && Number.isFinite(product.mjdEnd));
+}
+
+async function querySpherexCutoutProducts(ra, dec, detector, release, limit, motion = null) {
+  const searchCenter = positionAtMjd(ra, dec, motion, 61041);
+  const adqlQuery = `SELECT TOP ${limit} o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = '${release}' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${searchCenter.ra}, ${searchCenter.dec}), p.poly) ORDER BY p.time_bounds_lower`;
+  // SIA2 is IRSA's current image-search interface and is independent of TAP's
+  // async job queue, which can return gateway errors while the archive is busy.
+  try {
+    const siaProducts = await querySpherexCutoutProductsViaSia(ra, dec, detector, release, limit, motion);
+    if (siaProducts.length) return siaProducts;
+    console.warn(`[SPHEREx ${detector} ${release}] SIA2 returned no usable products; trying TAP.`);
+  } catch (siaError) {
+    console.warn(`[SPHEREx ${detector} ${release}] SIA2 discovery failed; trying TAP: ${siaError.message}`);
+  }
+  let payload;
+  try {
+    payload = await queueIrsaTap(() => queryIrsaTapAsync(adqlQuery, { label: `SPHEREx ${detector} ${release} cutout search` }));
+  } catch (tapError) {
+    throw new Error(`IRSA image discovery failed via SIA2 and TAP (${tapError.message}).`);
+  }
   const table = payload?.VOTABLE?.RESOURCE_ARRAY?.[0]?.TABLE;
   const fields = table?.FIELD_ARRAY?.map(field => field['<xmlattr>']?.name);
   const rows = table?.DATA?.TABLEDATA;
@@ -1031,7 +1197,8 @@ async function extractSpherexImageCutout(product, ra, dec, motion, size = 64) {
     throw new Error('SPHEREx archive product has an invalid or unsupported file size.');
   }
   const url = new URL(product.uri, 'https://irsa.ipac.caltech.edu/');
-  if (url.hostname !== 'irsa.ipac.caltech.edu' || !url.pathname.startsWith('/ibe/data/spherex/')) {
+  if (url.hostname !== 'irsa.ipac.caltech.edu'
+      || !/^\/(?:ibe\/)?data\/(?:spherex|SPHEREx)\//i.test(url.pathname)) {
     throw new Error('SPHEREx archive returned an unexpected product URL.');
   }
   const headerResponse = await fetchFitsRange(url.toString(), [[0, 65535]]);
@@ -1137,7 +1304,7 @@ ipcMain.handle('spherex:load-cutouts', async (event, {
     }
 
     const cacheKey = [ra.toFixed(7), dec.toFixed(7), detector, collection, frameLimit,
-      ...(motion ? [motion.pmra, motion.pmdec, motion.refEpoch] : [])].join(':');
+      ...(motion ? [motion.ra, motion.dec, motion.pmra, motion.pmdec, motion.refEpoch] : [])].join(':');
     const cached = spherexCutoutCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return { success: true, ...cached.result, cached: true };
 
@@ -1151,7 +1318,7 @@ ipcMain.handle('spherex:load-cutouts', async (event, {
         for (const detectorName of detectors) {
           try {
             const detectorLimit = detector === 'all' ? Math.min(2, frameLimit) : frameLimit;
-            productsByDetector.push(...await querySpherexCutoutProducts(ra, dec, detectorName, release, detectorLimit));
+            productsByDetector.push(...await querySpherexCutoutProducts(ra, dec, detectorName, release, detectorLimit, motion));
           } catch (error) {
             failures.push(`${detectorName} ${release}: ${error.message}`);
           }
@@ -1210,15 +1377,79 @@ ipcMain.handle('spherex:load-cutouts', async (event, {
 ipcMain.handle('spherex:query-gaia', async (event, { adqlQuery, requestId }) => {
   const tapUrl = 'https://gea.esac.esa.int/tap-server/tap';
   let jobUrl;
+  const requestScope = typeof requestId === 'number' && requestId < 0 ? 'hover' : 'field';
   const tapRequest = { requestId, cancelled: false, jobUrl: null };
-  const previousRequest = activeGaiaTapRequest;
-  activeGaiaTapRequest = tapRequest;
+  const activeFieldRequest = activeGaiaTapRequests.get('field');
+  if (requestScope === 'hover' && activeFieldRequest && !activeFieldRequest.cancelled) {
+    return { success: false, error: 'Gaia DR3 field query is active; hover lookup was skipped.' };
+  }
+  if (requestScope === 'field') {
+    const activeHoverRequest = activeGaiaTapRequests.get('hover');
+    if (activeHoverRequest) {
+      activeHoverRequest.cancelled = true;
+      void abortGaiaTapJob(activeHoverRequest.jobUrl);
+    }
+  }
+  const previousRequest = activeGaiaTapRequests.get(requestScope);
+  activeGaiaTapRequests.set(requestScope, tapRequest);
   if (previousRequest) {
     previousRequest.cancelled = true;
     void abortGaiaTapJob(previousRequest.jobUrl);
   }
-  const isSuperseded = () => tapRequest.cancelled || activeGaiaTapRequest !== tapRequest;
+  const isSuperseded = () => tapRequest.cancelled || activeGaiaTapRequests.get(requestScope) !== tapRequest;
   try {
+    // Small cone searches (including the app's 500-source overlay) are more
+    // reliable through Gaia's synchronous TAP endpoint and avoid orphaned UWS jobs.
+    const syncParams = new URLSearchParams({
+      REQUEST: 'doQuery', LANG: 'ADQL', FORMAT: 'json', QUERY: adqlQuery
+    });
+    try {
+      const syncResponse = await axios.post(`${tapUrl}/sync`, syncParams.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'SPHEREx-Electron-Tool/1.0'
+        },
+        timeout: 25000,
+        responseType: 'text',
+        transformResponse: [data => data],
+        validateStatus: () => true
+      });
+      if (syncResponse.status >= 200 && syncResponse.status < 300) {
+        return { success: true, data: syncResponse.data };
+      }
+      console.warn(`[Gaia TAP] Sync endpoint returned HTTP ${syncResponse.status}; trying async TAP.`);
+    } catch (syncError) {
+      if (isSuperseded()) return { success: false, error: 'Gaia TAP request was superseded by a newer target.' };
+      console.warn(`[Gaia TAP] ESA sync request failed (${syncError.message}); trying Gaia@AIP DR3 mirror.`);
+      try {
+        const mirrorParams = new URLSearchParams({
+          REQUEST: 'doQuery', LANG: 'ADQL', FORMAT: 'votable',
+          QUERY: adqlQuery
+        });
+        const mirrorResponse = await axios.post('https://gaia.aip.de/tap/sync', mirrorParams.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'SPHEREx-Electron-Tool/1.0'
+          },
+          timeout: 30000,
+          responseType: 'text',
+          transformResponse: [data => data],
+          validateStatus: () => true
+        });
+        if (mirrorResponse.status >= 200 && mirrorResponse.status < 300) {
+          return { success: true, data: mirrorResponse.data, mirror: 'Gaia@AIP DR3' };
+        }
+        const mirrorDetail = String(mirrorResponse.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
+        if (mirrorResponse.status === 429) {
+          return { success: false, error: `Gaia@AIP is at its concurrent-job limit. ASTERIA stopped this query instead of launching more jobs.${mirrorDetail ? ` ${mirrorDetail}` : ''}` };
+        }
+        console.warn(`[Gaia TAP] Gaia@AIP returned HTTP ${mirrorResponse.status}${mirrorDetail ? `: ${mirrorDetail}` : ''}; trying ESA async TAP.`);
+      } catch (mirrorError) {
+        console.warn(`[Gaia TAP] Gaia@AIP mirror failed (${mirrorError.message}); stopping to avoid queuing duplicate Gaia jobs.`);
+        return { success: false, error: `Gaia ESA sync and Gaia@AIP fallback both failed: ${mirrorError.message}` };
+      }
+    }
+
     const params = new URLSearchParams({
       REQUEST: 'doQuery',
       LANG: 'ADQL',
@@ -1236,7 +1467,7 @@ ipcMain.handle('spherex:query-gaia', async (event, { adqlQuery, requestId }) => 
           'User-Agent': 'SPHEREx-Electron-Tool/1.0'
         },
         maxRedirects: 0,
-        timeout: 20000,
+        timeout: 30000,
         responseType: 'text',
         transformResponse: [data => data],
         validateStatus: () => true
@@ -1328,7 +1559,7 @@ ipcMain.handle('spherex:query-gaia', async (event, { adqlQuery, requestId }) => 
     let result;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       result = await axios.get(`${jobUrl}/results/result`, {
-        timeout: 20000,
+        timeout: 30000,
         responseType: 'text',
         transformResponse: [data => data],
         validateStatus: () => true
@@ -1345,10 +1576,16 @@ ipcMain.handle('spherex:query-gaia', async (event, { adqlQuery, requestId }) => 
     if (isSuperseded()) {
       return { success: false, error: 'Gaia TAP request was superseded by a newer target.' };
     }
+    if (['ECONNABORTED', 'ETIMEDOUT'].includes(err.code)) {
+      if (jobUrl) await abortGaiaTapJob(jobUrl);
+      const timeoutMessage = 'Gaia TAP timed out. The query was stopped; ASTERIA did not resubmit it synchronously because that duplicated request was also timing out.';
+      console.error('[Gaia TAP Error]', timeoutMessage);
+      return { success: false, error: timeoutMessage };
+    }
     console.error('[Gaia TAP Error]', err.message);
     return { success: false, error: err.message };
   } finally {
-    if (activeGaiaTapRequest === tapRequest) activeGaiaTapRequest = null;
+    if (activeGaiaTapRequests.get(requestScope) === tapRequest) activeGaiaTapRequests.delete(requestScope);
   }
 });
 
@@ -1361,6 +1598,7 @@ ipcMain.handle('spherex:query-simbad-named-stars', async (event, { adqlQuery }) 
       QUERY: adqlQuery
     });
     const requestOptions = {
+      timeout: 30000,
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -1414,7 +1652,7 @@ ipcMain.handle('spherex:resolve-object', async (event, query) => {
     }
 
     // CDS Sesame Resolver with strict 3.5s timeout
-    const url = `https://cds.unistra.fr/cgi-bin/nph-sesame/-I?${encodeURIComponent(trimmed)}`;
+    const url = `https://cds.unistra.fr/cgi-bin/nph-sesame/?${encodeURIComponent(trimmed)}`;
     let res = null;
     try {
       res = await fetchURL(url, { timeout: 3500 });

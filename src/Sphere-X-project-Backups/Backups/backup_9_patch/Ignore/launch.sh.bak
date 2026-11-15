@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Universal ASTERIA Research Tool Launcher for macOS & Linux
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "$DIR"
+
+cat << "EOF"
+   ___    ____ _____ _____ ____ ___    _    
+  /   |  / ___|_   _| ____|  _ \_ _|  / \   
+ / /| | \___ \ | | |  _| | |_) | |  / _ \  
+/ ___ |  ___) || | | |___|  _ <| | / ___ \ 
+/_/  |_| |____/ |_| |_____|_| \_\___/_/   \_\
+                                             
+  ASTERIA Research Tool (Node 24 Launcher)
+=========================================================
+EOF
+
+if ! command -v node &> /dev/null; then
+    echo "❌ Error: Node.js is not installed or not in PATH."
+    exit 1
+fi
+
+node launch.js

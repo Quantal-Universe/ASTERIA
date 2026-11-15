@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('spherexAPI', {
   onCutoutProgress: (callback) => ipcRenderer.on('spherex:cutout-progress', (event, progress) => callback(progress)),
   queryGaia: (params) => ipcRenderer.invoke('spherex:query-gaia', params),
   querySimbadNamedStars: (params) => ipcRenderer.invoke('spherex:query-simbad-named-stars', params),
+  querySimbadCatalog: (params) => ipcRenderer.invoke('spherex:query-simbad-named-stars', params),
   resolveObject: (query) => ipcRenderer.invoke('spherex:resolve-object', query),
   fetchIBE: (params) => ipcRenderer.invoke('spherex:fetch-ibe', params),
   

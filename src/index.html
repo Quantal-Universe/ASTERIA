@@ -179,6 +179,60 @@
                         </div>
                     </section>
                 </div>
+    <div id="timeComparisonOverlay" class="hidden fixed inset-0 z-[8500] bg-slate-950/95 p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="timeComparisonTitle">
+        <section class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 px-4 py-3">
+                <div>
+                    <h2 id="timeComparisonTitle" class="text-lg font-bold text-white">SPHEREx Time Comparison</h2>
+                    <p class="text-xs text-slate-400">Follow one target through real dated SPHEREx images; apply Gaia DR3 proper motion and align the target at each observation epoch when available.</p>
+                </div>
+                <button id="closeTimeComparisonBtn" type="button" class="rounded border border-slate-600 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800" aria-label="Close time comparison">Close</button>
+            </header>
+            <form id="timeComparisonForm" class="flex flex-wrap items-end gap-3 border-b border-slate-800 bg-slate-950 p-3">
+                <label class="text-xs text-slate-400">Right ascension (degrees)
+                    <input id="timeComparisonRa" type="number" min="0" max="360" step="any" required class="mt-1 block w-40 rounded border border-slate-700 bg-slate-900 px-2 py-1.5 font-mono text-sm text-white" placeholder="150.119">
+                </label>
+                <label class="text-xs text-slate-400">Declination (degrees)
+                    <input id="timeComparisonDec" type="number" min="-90" max="90" step="any" required class="mt-1 block w-40 rounded border border-slate-700 bg-slate-900 px-2 py-1.5 font-mono text-sm text-white" placeholder="2.2058">
+                </label>
+                <label class="text-xs text-slate-400">Release
+                    <select id="timeComparisonRelease" class="mt-1 block rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-white"><option value="spherex_dr1">DR1 (current)</option><option value="spherex_qr3">QR3</option></select>
+                </label>
+                <label class="text-xs text-slate-400">Array
+                    <select id="timeComparisonDetector" class="mt-1 block rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-white"><option value="D1" selected>D1</option><option>D2</option><option>D3</option><option>D4</option><option>D5</option><option>D6</option><option value="all">All arrays</option></select>
+                </label>
+                <button id="timeComparisonLoadBtn" type="submit" class="rounded bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-600 disabled:opacity-50">Load real observations</button>
+                <span id="timeComparisonStatus" class="min-w-0 flex-1 text-xs text-slate-400" role="status" aria-live="polite">Enter coordinates and load available calibrated cutouts from the SPHEREx archive.</span>
+                <p class="w-full text-[11px] text-slate-500">A single detector keeps wavelength consistent while comparing epochs. “All arrays” includes different infrared bands in one sequence.</p>
+            </form>
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+                <aside class="w-full shrink-0 overflow-y-auto border-b border-slate-800 bg-slate-950 p-3 md:w-64 md:border-b-0 md:border-r" aria-label="Search objects and fields">
+                    <h3 class="text-sm font-semibold text-white">Find a sky target</h3>
+                    <form id="timeComparisonNameForm" class="mt-2 space-y-2">
+                        <label class="sr-only" for="timeComparisonNameSearch">Search target or field name</label>
+                        <input id="timeComparisonNameSearch" type="search" autocomplete="off" class="w-full rounded border border-slate-700 bg-slate-900 px-2.5 py-2 text-sm text-white" placeholder="Name, field, or catalog term">
+                        <button id="timeComparisonResolveNameBtn" type="submit" class="w-full rounded border border-cyan-800 px-2 py-1.5 text-xs font-semibold text-cyan-200 hover:bg-cyan-950">Resolve name and load</button>
+                    </form>
+                    <p id="timeComparisonSearchStatus" class="mt-2 min-h-8 text-[11px] text-slate-400" role="status" aria-live="polite">Search sample targets by partial name or type, or resolve another object name online.</p>
+                    <div id="timeComparisonTargetResults" class="mt-2 space-y-1.5"></div>
+                </aside>
+                <div id="timeComparisonWorkspace" class="flex min-h-0 min-w-0 flex-1 flex-col bg-black">
+                <div class="relative min-h-0 flex-1">
+                    <canvas id="timeComparisonCanvas" class="absolute inset-0 h-full w-full" role="img" aria-label="SPHEREx image at the selected observation epoch"></canvas>
+                    <div id="timeComparisonFrameMetadata" class="absolute left-3 top-3 max-w-[90%] rounded bg-slate-950/85 px-3 py-2 font-mono text-xs text-slate-200" role="status" aria-live="polite">No SPHEREx images loaded.</div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 border-t border-slate-800 bg-slate-950 p-3">
+                    <button id="timeComparisonPrevBtn" type="button" class="rounded border border-slate-700 px-3 py-2 text-slate-200 disabled:opacity-40" aria-label="Previous observation" disabled>◀</button>
+                    <button id="timeComparisonPlayBtn" type="button" class="rounded bg-cyan-900 px-3 py-2 text-slate-100 disabled:opacity-40" aria-label="Play observations" disabled>▶ Play</button>
+                    <button id="timeComparisonNextBtn" type="button" class="rounded border border-slate-700 px-3 py-2 text-slate-200 disabled:opacity-40" aria-label="Next observation" disabled>▶|</button>
+                    <label class="flex items-center gap-2 text-xs text-slate-400">Playback speed <input id="timeComparisonSpeed" type="range" min="250" max="2000" step="250" value="1000" class="w-28 accent-cyan-400"></label>
+                    <span id="timeComparisonEpochLabel" class="min-w-24 font-mono text-xs text-cyan-300">No epochs</span>
+                    <input id="timeComparisonScrubber" type="range" min="0" max="0" value="0" class="min-w-32 flex-1 accent-cyan-400" aria-label="Select observation epoch" disabled>
+                </div>
+                </div>
+            </div>
+        </section>
+    </div>
     <div id="app">
         <!-- LEFT PANEL: Search results (Fixed top) -->
         <aside class="panel" id="left">
@@ -207,6 +261,9 @@
                 <button id="openDetailedMapBtn" type="button" class="w-full rounded-lg border border-cyan-800 bg-cyan-950/60 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-900">
                     <i class="fa-solid fa-map-location-dot mr-2"></i>Detailed Sky Map
                 </button>
+                <button id="openTimeComparisonBtn" type="button" class="mt-2 w-full rounded-lg border border-violet-800 bg-violet-950/50 px-3 py-2 text-sm font-semibold text-violet-200 hover:bg-violet-900">
+                    <i class="fa-solid fa-clock-rotate-left mr-2"></i>Time Comparison
+                </button>
             </div>
             <!-- RESTORED DETAILS AREA IN LEFT PANEL -->
             <div id="detailsArea" class="p-4 border-t border-slate-700 bg-slate-900/80">
@@ -225,12 +282,12 @@
                 </div>
 
 
-                <div id="starPlottingArea" class="flex-1 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
+                <div id="starPlottingArea" class="flex-1 min-h-0 bg-slate-900 rounded border border-slate-700 relative overflow-hidden">
                     <canvas id="starCanvas" class="w-full h-full" role="img" aria-label="Star-field plot showing the selected target and surrounding catalog sources" aria-describedby="backgroundCatalogStatus"></canvas>
                     <!-- Tooltip for star hover -->
                     <div id="starTooltip" class="absolute pointer-events-none bg-slate-950/90 border border-cyan-500/50 text-[10px] text-white p-2 rounded shadow-2xl hidden z-[9999]" role="tooltip" aria-live="polite"></div>
-                    <div id="backgroundCatalogStatus" class="absolute bottom-2 left-2 right-2 rounded bg-slate-950/80 px-2 py-1 text-[9px] text-slate-300 mono whitespace-pre-line pointer-events-none" role="status" aria-live="polite">Gaia DR3 sources, SPHEREx observations, and named-star references appear here when you select a target.</div>
                 </div>
+                <div id="backgroundCatalogStatus" class="mt-2 max-h-10 shrink-0 overflow-y-auto rounded bg-slate-900 px-2 py-1 text-[9px] leading-3 text-slate-300 mono whitespace-pre-line" role="status" aria-live="polite">Gaia DR3 sources, SPHEREx observations, and named-star references appear here when you select a target.</div>
             </div>
             
             <div id="lowerWorkspace" class="flex-1 min-h-0 flex overflow-hidden">
@@ -311,6 +368,38 @@
                             <button id="copyViewLinkBtn" type="button" class="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-200" title="Copy a link that restores the current target, field of view, and viewer mode">Copy link</button>
                             <button id="embedViewBtn" type="button" class="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-200" title="Copy an iframe snippet for this sky view">Embed</button>
                         </div>
+                    </section>
+                    <section id="epochAnalysisPanel" class="shrink-0 border-t border-slate-700 bg-slate-950/80 p-3" aria-labelledby="epochAnalysisTitle">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h2 id="epochAnalysisTitle" class="text-xs font-semibold text-slate-100">SPHEREx epoch position &amp; brightness</h2>
+                                <p class="text-[9px] text-slate-500">Measured from loaded, real detector cutouts for one array and band.</p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <label for="epochAnalysisDetector" class="text-[9px] text-slate-400">Array</label>
+                                <select id="epochAnalysisDetector" class="rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-[9px] text-white" disabled><option value="">Load cutouts first</option></select>
+                                <button id="analyzeEpochsBtn" type="button" class="rounded border border-cyan-800 px-2 py-1 text-[9px] text-cyan-200 hover:bg-cyan-950 disabled:opacity-40" disabled>Analyze epochs</button>
+                                <button id="exportEpochAnalysisBtn" type="button" class="rounded border border-slate-700 px-2 py-1 text-[9px] text-slate-200 hover:bg-slate-800 disabled:opacity-40" disabled>Export CSV</button>
+                            </div>
+                        </div>
+                        <p id="epochAnalysisStatus" class="mt-2 text-[9px] text-slate-400" role="status" aria-live="polite">Load at least two SPHEREx cutouts, then analyze their measured position and local surface brightness.</p>
+                        <div class="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-2">
+                            <div class="min-w-0 rounded border border-slate-800 bg-slate-950 p-1.5">
+                                <div class="px-1 text-[9px] text-slate-400">Local background-subtracted brightness · MJy/sr</div>
+                                <canvas id="epochBrightnessChart" class="h-40 w-full" role="img" aria-label="Measured SPHEREx target brightness by observation epoch"></canvas>
+                            </div>
+                            <div class="min-w-0 rounded border border-slate-800 bg-slate-950 p-1.5">
+                                <div class="px-1 text-[9px] text-slate-400">Measured sky position · offset from first valid epoch</div>
+                                <canvas id="epochPositionChart" class="h-40 w-full" role="img" aria-label="Measured SPHEREx target positions across observation epochs"></canvas>
+                            </div>
+                        </div>
+                        <div class="mt-2 max-h-48 overflow-auto rounded border border-slate-800">
+                            <table class="w-full text-left text-[9px] text-slate-300">
+                                <thead class="sticky top-0 bg-slate-900 text-slate-400"><tr><th class="p-1.5">UTC epoch</th><th class="p-1.5">RA / Dec</th><th class="p-1.5">Δ from first</th><th class="p-1.5">Brightness</th><th class="p-1.5">λ</th><th class="p-1.5">Observation</th></tr></thead>
+                                <tbody id="epochAnalysisRows"><tr><td colspan="6" class="p-2 text-slate-500">No epoch measurements yet.</td></tr></tbody>
+                            </table>
+                        </div>
+                        <p class="mt-2 text-[8px] leading-relaxed text-slate-500">Quick-look only: position is a positive-excess-weighted pixel centroid and brightness is the aperture median minus a local annulus median. Measurements exclude nonzero quality flags. They are not PSF-fitted astrometry or calibrated point-source photometry; wavelength is reported because brightness can change with band.</p>
                     </section>
                     <section id="spectrumPanel" class="min-h-[320px] shrink-0 border-t border-slate-700 bg-slate-950/80 p-3" aria-labelledby="spectrumTitle">
                         <div class="flex items-center justify-between gap-2">
@@ -400,6 +489,7 @@
         </section>
     </div>
 
+    <script src="./constellation-boundaries.js"></script>
     <script>
         // --- AUTHENTICATION FLOW ---
         let authFlowGeneration = 0;
@@ -434,7 +524,7 @@
             }
         });
 
-        const appDialogIds = ['detailedMapOverlay', 'settingsOverlay', 'guidedTourOverlay'];
+        const appDialogIds = ['detailedMapOverlay', 'timeComparisonOverlay', 'settingsOverlay', 'guidedTourOverlay'];
         const dialogReturnFocus = new WeakMap();
 
         function openAppDialog(overlay, trigger, initialFocusSelector) {
@@ -454,7 +544,8 @@
             if (!overlay) return;
             if (event.key === 'Escape') {
                 event.preventDefault();
-                closeAppDialog(overlay);
+                if (overlay.id === 'timeComparisonOverlay') closeTimeComparison();
+                else closeAppDialog(overlay);
                 return;
             }
             if (event.key !== 'Tab') return;
@@ -605,12 +696,14 @@
             measuring: false,
             measurementPoints: [],
             comparisonSamples: null,
+            epochAnalysis: null,
             pendingFrameIndex: 0,
             pendingBand: '',
             progressCompleted: 0,
             progressTotal: 0,
             exportingGif: false
         };
+        const timeComparisonState = { frames: [], index: 0, timer: null, requestId: 0, target: null, selectedTarget: null, loading: false, coordinateNote: '' };
         const spectrumGraphFrame = document.getElementById('spectrumGraphFrame');
         let pendingSpectrumGraphMessage = null;
         spectrumGraphFrame.addEventListener('load', () => {
@@ -626,11 +719,11 @@
         let timelineTimer = null;
         let chatPending = false;
         const presetTargets = [
-            { id: 'Barnards-Star', name: "Barnard's Star", ra: 269.452, dec: 4.693, type: 'Red Dwarf', dist: '6.0 ly', mag: '9.5', desc: 'Famous high-proper-motion red dwarf star in Ophiuchus — the fastest-moving star in the sky.', chem: 'Hydrogen, Helium' },
-            { id: 'Epsilon-Indi-B', name: 'Epsilon Indi Ba,Bb', ra: 330.938, dec: -56.772, type: 'Brown Dwarf Pair', dist: '11.8 ly', mag: '14.5', desc: 'Pair of brown dwarfs orbiting Epsilon Indi A — rich in methane and water vapor.', chem: 'Methane (CH4), Water (H2O)' },
-            { id: 'WISE-0855', name: 'WISE 0855-0714', ra: 133.795, dec: -7.245, type: 'Brown Dwarf', dist: '7.2 ly', mag: '16.1', desc: 'Cold Y-dwarf with water ice clouds — the coldest sub-stellar object known beyond the solar system.', chem: 'Water (H2O) Ice, Ammonia' },
-            { id: 'RW-Aurigae', name: 'RW Aurigae', ra: 75.751, dec: 30.407, type: 'Variable Star', dist: '390 ly', mag: '10.5', desc: 'T Tauri variable star with disk eclipses and protoplanetary disk.', chem: 'Carbon Monoxide (CO), Water (H2O)' },
-            { id: 'R-Draconis', name: 'R Draconis', ra: 248.887, dec: 66.721, type: 'Variable Star', dist: '1000 ly', mag: '7.6', desc: 'Mira-type long-period variable AGB star pulsating with 245-day period.', chem: 'Titanium Oxide (TiO), Carbon Dioxide (CO2)' },
+            { id: 'Barnards-Star', name: "Barnard's Star", ra: 269.45207696, dec: 4.69336497, type: 'Red Dwarf', dist: '6.0 ly', mag: '9.5', desc: 'Famous high-proper-motion red dwarf star in Ophiuchus — the fastest-moving star in the sky.', chem: 'Hydrogen, Helium' },
+            { id: 'Epsilon-Indi-B', name: 'Epsilon Indi Ba,Bb', ra: 331.04414659, dec: -56.78284420, type: 'Brown Dwarf Pair', dist: '11.8 ly', mag: '14.5', desc: 'Pair of brown dwarfs orbiting Epsilon Indi A — rich in methane and water vapor.', chem: 'Methane (CH4), Water (H2O)' },
+            { id: 'WISE-0855', name: 'WISE 0855-0714', ra: 133.79512917, dec: -7.24514722, type: 'Brown Dwarf', dist: '7.2 ly', mag: '16.1', desc: 'Cold Y-dwarf with water ice clouds — the coldest sub-stellar object known beyond the solar system.', chem: 'Water (H2O) Ice, Ammonia' },
+            { id: 'RW-Aurigae', name: 'RW Aurigae', ra: 76.95652603, dec: 30.40143817, type: 'Variable Star', dist: '390 ly', mag: '10.5', desc: 'T Tauri variable star with disk eclipses and protoplanetary disk.', chem: 'Carbon Monoxide (CO), Water (H2O)' },
+            { id: 'R-Draconis', name: 'R Draconis', ra: 248.16761083, dec: 66.75497942, type: 'Variable Star', dist: '1000 ly', mag: '7.6', desc: 'Mira-type long-period variable AGB star pulsating with 245-day period.', chem: 'Titanium Oxide (TiO), Carbon Dioxide (CO2)' },
             { id: 'COSMOS-Field', name: 'COSMOS Deep Field', ra: 150.119, dec: 2.2058, type: 'Extragalactic Survey Field', isField: true, mag: '18.4', desc: 'Prime extragalactic deep survey field — thousands of distant galaxies observed by SPHEREx.', chem: 'Hydrogen, Helium, Carbon' },
             { id: 'Andromeda', name: 'Andromeda Galaxy (M31)', ra: 10.685, dec: 41.269, type: 'Galaxy', dist: '2.537 Mly', mag: '3.44', desc: 'Nearest large spiral galaxy to the Milky Way — on a collision course with us in ~4.5 billion years.', chem: 'Hydrogen, Helium, Carbon, Polycyclic Aromatic Hydrocarbons' },
             { id: 'Orion-Nebula', name: 'Orion Nebula (M42)', ra: 83.822, dec: -5.391, type: 'Nebula', dist: '1344 ly', mag: '4.0', desc: 'Closest massive star-forming region to Earth — a stellar nursery with hundreds of young stars.', chem: 'Hydrogen, Helium, PAH, Water (H2O)' },
@@ -912,7 +1005,9 @@
                 const bounds = getConeSearchBounds(position.ra, position.dec, radiusDegrees);
                 const ra = position.ra.toFixed(8);
                 const dec = position.dec.toFixed(8);
-                const query = `SELECT TOP 50 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${bounds.decMin} AND ${bounds.decMax}${bounds.raCondition} AND 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radiusDegrees.toFixed(8)})) ORDER BY DISTANCE(POINT('ICRS', ra, dec), POINT('ICRS', ${ra}, ${dec}))`;
+                // The cone filter keeps the request local; choose a small real-row
+                // subset and calculate nearest-source ordering in the renderer.
+                const query = `SELECT TOP 50 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${bounds.decMin} AND ${bounds.decMax}${bounds.raCondition} AND 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radiusDegrees.toFixed(8)}))`;
                 try {
                     const response = await window.spherexAPI.queryGaia({ adqlQuery: query, requestId: -requestId });
                     if (requestId !== skyMapHoverQueryRequestId) return;
@@ -1183,7 +1278,9 @@
             skyMapViewportQueryTimer = setTimeout(async () => {
                 const requestId = ++skyMapViewportQueryRequestId;
                 const bounds = getConeSearchBounds(center.ra, center.dec, radius);
-                const query = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${bounds.decMin} AND ${bounds.decMax}${bounds.raCondition} ORDER BY random_index`;
+                const ra = center.ra.toFixed(8);
+                const dec = center.dec.toFixed(8);
+                const query = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${bounds.decMin} AND ${bounds.decMax}${bounds.raCondition} AND 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radius.toFixed(8)}))`;
                 try {
                     const response = await window.spherexAPI.queryGaia({ adqlQuery: query, requestId: -1000000 - requestId });
                     if (requestId !== skyMapViewportQueryRequestId || !response?.success) return;
@@ -1467,6 +1564,50 @@
         document.getElementById('detailedMapOverlay').addEventListener('click', event => {
             if (event.target === event.currentTarget) closeAppDialog(event.currentTarget);
         });
+        document.getElementById('openTimeComparisonBtn').addEventListener('click', () => {
+            const target = appState.currentTarget;
+            if (target) {
+                document.getElementById('timeComparisonRa').value = Number(target.ra).toFixed(6);
+                document.getElementById('timeComparisonDec').value = Number(target.dec).toFixed(6);
+                document.getElementById('timeComparisonNameSearch').value = target.name || '';
+                timeComparisonState.selectedTarget = target;
+            }
+            openAppDialog(document.getElementById('timeComparisonOverlay'), document.getElementById('openTimeComparisonBtn'), '#timeComparisonRa');
+            drawTimeComparisonFrame();
+        });
+        document.getElementById('closeTimeComparisonBtn').addEventListener('click', closeTimeComparison);
+        document.getElementById('timeComparisonOverlay').addEventListener('click', event => {
+            if (event.target === event.currentTarget) closeTimeComparison();
+        });
+        document.getElementById('timeComparisonForm').addEventListener('submit', event => {
+            event.preventDefault();
+            void loadTimeComparisonFrames();
+        });
+        document.getElementById('timeComparisonNameSearch').addEventListener('input', event => {
+            timeComparisonState.selectedTarget = null;
+            renderTimeComparisonTargetResults(event.target.value);
+        });
+        document.getElementById('timeComparisonNameForm').addEventListener('submit', event => {
+            event.preventDefault();
+            void resolveTimeComparisonTargetName();
+        });
+        ['timeComparisonRa', 'timeComparisonDec'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                timeComparisonState.coordinateNote = '';
+                timeComparisonState.selectedTarget = null;
+            });
+        });
+        document.getElementById('timeComparisonPrevBtn').addEventListener('click', () => setTimeComparisonFrame(timeComparisonState.index - 1));
+        document.getElementById('timeComparisonNextBtn').addEventListener('click', () => setTimeComparisonFrame(timeComparisonState.index + 1));
+        document.getElementById('timeComparisonPlayBtn').addEventListener('click', toggleTimeComparisonPlayback);
+        document.getElementById('timeComparisonScrubber').addEventListener('input', event => setTimeComparisonFrame(Number(event.target.value)));
+        document.getElementById('timeComparisonSpeed').addEventListener('input', () => {
+            if (timeComparisonState.timer) {
+                toggleTimeComparisonPlayback();
+                toggleTimeComparisonPlayback();
+            }
+        });
+        renderTimeComparisonTargetResults();
         document.getElementById('skyMapSearchForm').addEventListener('submit', async event => {
             event.preventDefault();
             const errorElement = document.getElementById('skyMapSearchError');
@@ -1737,6 +1878,8 @@
             document.getElementById('exportBlinkVideoBtn').disabled = frames.length < 2;
             document.getElementById('reportDiscoveryBtn').disabled = !hasFrames || !appState.currentTarget;
             document.getElementById('measureMotionBtn').disabled = frames.length < 2;
+            document.getElementById('analyzeEpochsBtn').disabled = blinkState.frames.length < 2 || blinkState.status !== 'loaded';
+            document.getElementById('exportEpochAnalysisBtn').disabled = !blinkState.epochAnalysis?.samples?.length;
             document.getElementById('detectCandidatesBtn').disabled = frames.length < 2;
             document.getElementById('blinkCompositeControls').classList.toggle('hidden', document.getElementById('blinkMode').value !== 'composite');
             document.getElementById('blinkMotionStatus').textContent = blinkState.error || blinkState.progress
@@ -1744,6 +1887,289 @@
             renderBlinkBandOptions();
             renderBlinkCompositeOptions();
             drawSky();
+        }
+
+        function syncEpochAnalysisDetectorOptions() {
+            const select = document.getElementById('epochAnalysisDetector');
+            if (!select) return;
+            const detectors = [...new Set(blinkState.frames.map(frame => frame.detector).filter(Boolean))].sort();
+            const previous = select.value;
+            select.replaceChildren();
+            detectors.forEach(detector => select.add(new Option(detector, detector)));
+            if (!detectors.length) {
+                select.add(new Option('Load cutouts first', ''));
+                select.disabled = true;
+                return;
+            }
+            const preferred = document.getElementById('blinkDetector').value;
+            select.value = detectors.includes(previous) ? previous : detectors.includes(preferred) ? preferred : detectors[0];
+            select.disabled = false;
+        }
+
+        function clearEpochAnalysis(message = 'Load at least two SPHEREx cutouts, then analyze their measured position and local surface brightness.') {
+            blinkState.epochAnalysis = null;
+            const status = document.getElementById('epochAnalysisStatus');
+            if (status) status.textContent = message;
+            const select = document.getElementById('epochAnalysisDetector');
+            if (select) {
+                select.replaceChildren(new Option('Load cutouts first', ''));
+                select.disabled = true;
+            }
+            if (document.getElementById('epochAnalysisRows')) renderEpochAnalysis();
+            if (document.getElementById('analyzeEpochsBtn')) updateBlinkControls();
+        }
+
+        function medianValue(values) {
+            if (!values.length) return NaN;
+            const sorted = values.slice().sort((a, b) => a - b);
+            const middle = Math.floor(sorted.length / 2);
+            return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+        }
+
+        function measureSpherexEpochFrame(frame) {
+            const { width, height, pixels, flags } = frame;
+            const cx = Number(frame.centerX);
+            const cy = Number(frame.centerY);
+            if (!Number.isInteger(width) || !Number.isInteger(height) || !pixels || !flags
+                || pixels.length !== width * height || flags.length !== pixels.length
+                || !Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+            const aperture = [];
+            const annulus = [];
+            const aperturePixels = [];
+            const minX = Math.max(0, Math.floor(cx - 9));
+            const maxX = Math.min(width - 1, Math.ceil(cx + 9));
+            const minY = Math.max(0, Math.floor(cy - 9));
+            const maxY = Math.min(height - 1, Math.ceil(cy + 9));
+            for (let y = minY; y <= maxY; y += 1) {
+                for (let x = minX; x <= maxX; x += 1) {
+                    const index = y * width + x;
+                    const value = Number(pixels[index]);
+                    if (flags[index] !== 0 || !Number.isFinite(value)) continue;
+                    const radius = Math.hypot(x - cx, y - cy);
+                    if (radius <= 3.5) {
+                        aperture.push(value);
+                        aperturePixels.push({ x, y, value });
+                    } else if (radius >= 5 && radius <= 9) annulus.push(value);
+                }
+            }
+            if (aperture.length < 6 || annulus.length < 12) return null;
+            const background = medianValue(annulus);
+            const brightness = medianValue(aperture) - background;
+            if (!Number.isFinite(background) || !Number.isFinite(brightness)) return null;
+            const robustNoise = 1.4826 * medianValue(annulus.map(value => Math.abs(value - background)));
+            const peakExcess = Math.max(...aperture) - background;
+            let totalWeight = 0;
+            let centroidX = 0;
+            let centroidY = 0;
+            if (Number.isFinite(robustNoise) && peakExcess > Math.max(3 * robustNoise, 1e-12)) {
+                for (const pixel of aperturePixels) {
+                    const weight = Math.max(0, pixel.value - background);
+                    totalWeight += weight;
+                    centroidX += pixel.x * weight;
+                    centroidY += pixel.y * weight;
+                }
+            }
+            let ra = NaN;
+            let dec = NaN;
+            if (totalWeight > 0 && Number.isFinite(frame.centerRa) && Number.isFinite(frame.centerDec)
+                && frame.cdMatrix?.length === 2 && frame.cdMatrix.every(row => row?.length === 2 && row.every(Number.isFinite))) {
+                centroidX /= totalWeight;
+                centroidY /= totalWeight;
+                const dx = centroidX - cx;
+                const dy = centroidY - cy;
+                const eastDegrees = frame.cdMatrix[0][0] * dx + frame.cdMatrix[0][1] * dy;
+                const northDegrees = frame.cdMatrix[1][0] * dx + frame.cdMatrix[1][1] * dy;
+                const cosine = Math.cos(frame.centerDec * Math.PI / 180);
+                if (Math.abs(cosine) > 1e-6) {
+                    ra = ((frame.centerRa + eastDegrees / cosine) % 360 + 360) % 360;
+                    dec = frame.centerDec + northDegrees;
+                    if (dec < -90 || dec > 90) { ra = NaN; dec = NaN; }
+                }
+            }
+            return {
+                timestamp: Number(frame.timestamp),
+                observationId: frame.observationId || '',
+                detector: frame.detector || '',
+                collection: frame.collection || '',
+                wavelengthUm: Number(frame.wavelengthUm),
+                brightnessMjySr: brightness,
+                ra,
+                dec
+            };
+        }
+
+        function analyzeLoadedEpochs() {
+            const detector = document.getElementById('epochAnalysisDetector').value;
+            const selectedBand = document.getElementById('blinkBand').value;
+            let frames = blinkState.frames.filter(frame => frame.detector === detector);
+            if (selectedBand !== 'all' && frames.length) {
+                const band = Number(selectedBand);
+                const nearest = Math.min(...frames.map(frame => Math.abs(frame.wavelengthUm - band)));
+                frames = frames.filter(frame => Math.abs(frame.wavelengthUm - band) <= nearest + 1e-8);
+            }
+            const samples = frames.map(measureSpherexEpochFrame).filter(sample => sample && Number.isFinite(sample.timestamp))
+                .sort((a, b) => a.timestamp - b.timestamp);
+            if (samples.length < 2) {
+                blinkState.epochAnalysis = null;
+                document.getElementById('epochAnalysisStatus').textContent = `Only ${samples.length} usable ${detector || 'detector'} epoch measurement${samples.length === 1 ? '' : 's'} found. Load at least two clean cutouts with valid aperture and background pixels.`;
+                renderEpochAnalysis();
+                updateBlinkControls();
+                return;
+            }
+            const firstPosition = samples.find(sample => Number.isFinite(sample.ra) && Number.isFinite(sample.dec));
+            samples.forEach(sample => {
+                if (!firstPosition || !Number.isFinite(sample.ra) || !Number.isFinite(sample.dec)) {
+                    sample.eastOffsetArcsec = NaN;
+                    sample.northOffsetArcsec = NaN;
+                    sample.displacementArcsec = NaN;
+                    return;
+                }
+                const deltaRa = ((sample.ra - firstPosition.ra + 540) % 360) - 180;
+                sample.eastOffsetArcsec = deltaRa * Math.cos(firstPosition.dec * Math.PI / 180) * 3600;
+                sample.northOffsetArcsec = (sample.dec - firstPosition.dec) * 3600;
+                sample.displacementArcsec = Math.hypot(sample.eastOffsetArcsec, sample.northOffsetArcsec);
+            });
+            blinkState.epochAnalysis = { detector, samples, targetName: appState.currentTarget?.name || 'Selected target' };
+            const measuredPositions = samples.filter(sample => Number.isFinite(sample.ra)).length;
+            document.getElementById('epochAnalysisStatus').textContent = `${samples.length} real ${detector} cutout epochs analyzed${measuredPositions ? ` · ${measuredPositions} centroid positions measured` : ' · no reliable centroid in these frames'}. Brightness is local surface-brightness excess, not source flux.`;
+            renderEpochAnalysis();
+            updateBlinkControls();
+        }
+
+        function configureEpochChart(canvas, title) {
+            const ratio = Math.max(1, window.devicePixelRatio || 1);
+            const width = Math.max(280, canvas.clientWidth || 600);
+            const height = Math.max(120, canvas.clientHeight || 160);
+            canvas.width = Math.round(width * ratio);
+            canvas.height = Math.round(height * ratio);
+            const context = canvas.getContext('2d');
+            context.setTransform(ratio, 0, 0, ratio, 0, 0);
+            context.clearRect(0, 0, width, height);
+            context.fillStyle = '#020617';
+            context.fillRect(0, 0, width, height);
+            context.font = '9px Inter, sans-serif';
+            context.fillStyle = '#94a3b8';
+            context.textAlign = 'center';
+            context.fillText(title, width / 2, 11);
+            return { context, width, height };
+        }
+
+        function drawEpochBrightnessChart(samples) {
+            const canvas = document.getElementById('epochBrightnessChart');
+            const { context: ctx, width, height } = configureEpochChart(canvas, 'Brightness by exposure time');
+            const points = samples.filter(sample => Number.isFinite(sample.brightnessMjySr));
+            if (!points.length) {
+                ctx.fillText('No valid brightness measurements', width / 2, height / 2);
+                return;
+            }
+            const left = 45, right = width - 12, top = 22, bottom = height - 25;
+            let minY = Math.min(...points.map(sample => sample.brightnessMjySr));
+            let maxY = Math.max(...points.map(sample => sample.brightnessMjySr));
+            if (maxY - minY < 1e-12) { minY -= 0.5; maxY += 0.5; }
+            else { const pad = (maxY - minY) * 0.12; minY -= pad; maxY += pad; }
+            const timeStart = points[0].timestamp, timeEnd = points.at(-1).timestamp;
+            const xFor = (sample, index) => timeEnd > timeStart
+                ? left + (sample.timestamp - timeStart) / (timeEnd - timeStart) * (right - left)
+                : left + index / Math.max(1, points.length - 1) * (right - left);
+            const yFor = value => bottom - (value - minY) / (maxY - minY) * (bottom - top);
+            ctx.strokeStyle = '#1e293b'; ctx.fillStyle = '#64748b'; ctx.textAlign = 'right';
+            for (let tick = 0; tick <= 3; tick += 1) {
+                const y = top + (bottom - top) * tick / 3;
+                const value = maxY - (maxY - minY) * tick / 3;
+                ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+                ctx.fillText(value.toPrecision(3), left - 4, y + 3);
+            }
+            ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 1.5; ctx.beginPath();
+            points.forEach((sample, index) => {
+                const x = xFor(sample, index), y = yFor(sample.brightnessMjySr);
+                if (!index) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            points.forEach((sample, index) => {
+                ctx.fillStyle = '#67e8f9'; ctx.beginPath(); ctx.arc(xFor(sample, index), yFor(sample.brightnessMjySr), 3, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left';
+            ctx.fillText(new Date(points[0].timestamp).toISOString().slice(0, 10), left, height - 7);
+            ctx.textAlign = 'right';
+            ctx.fillText(new Date(points.at(-1).timestamp).toISOString().slice(0, 10), right, height - 7);
+        }
+
+        function drawEpochPositionChart(samples) {
+            const canvas = document.getElementById('epochPositionChart');
+            const { context: ctx, width, height } = configureEpochChart(canvas, 'Centroid path relative to first epoch');
+            const points = samples.filter(sample => Number.isFinite(sample.eastOffsetArcsec) && Number.isFinite(sample.northOffsetArcsec));
+            if (points.length < 2) {
+                ctx.fillText('Two valid centroids are needed for a position track', width / 2, height / 2);
+                return;
+            }
+            const extent = Math.max(0.01, ...points.map(point => Math.max(Math.abs(point.eastOffsetArcsec), Math.abs(point.northOffsetArcsec)))) * 1.15;
+            const span = Math.min(width - 65, height - 55);
+            const scale = span / (2 * extent);
+            const cx = width / 2, cy = height / 2 + 2;
+            ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(cx - span / 2, cy); ctx.lineTo(cx + span / 2, cy); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx, cy - span / 2); ctx.lineTo(cx, cy + span / 2); ctx.stroke();
+            ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 1.5; ctx.beginPath();
+            points.forEach((point, index) => {
+                const x = cx + point.eastOffsetArcsec * scale;
+                const y = cy - point.northOffsetArcsec * scale;
+                if (!index) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            points.forEach((point, index) => {
+                const x = cx + point.eastOffsetArcsec * scale;
+                const y = cy - point.northOffsetArcsec * scale;
+                ctx.fillStyle = index === 0 ? '#fbbf24' : '#c4b5fd';
+                ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'left'; ctx.fillText(String(index + 1), x + 4, y - 3);
+            });
+            ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left';
+            ctx.fillText(`${extent.toPrecision(2)}″`, cx + span / 2 + 3, cy + 3);
+            ctx.fillText('east →', width - 40, height - 7);
+            ctx.fillText('north ↑', 10, 24);
+        }
+
+        function renderEpochAnalysis() {
+            const result = blinkState.epochAnalysis;
+            const tbody = document.getElementById('epochAnalysisRows');
+            if (!result?.samples?.length) {
+                drawEpochBrightnessChart([]);
+                drawEpochPositionChart([]);
+                tbody.innerHTML = '<tr><td colspan="6" class="p-2 text-slate-500">No epoch measurements yet.</td></tr>';
+                return;
+            }
+            drawEpochBrightnessChart(result.samples);
+            drawEpochPositionChart(result.samples);
+            tbody.innerHTML = result.samples.map(sample => {
+                const date = new Date(sample.timestamp).toISOString();
+                const coordinate = Number.isFinite(sample.ra) && Number.isFinite(sample.dec)
+                    ? `${sample.ra.toFixed(6)}°, ${sample.dec.toFixed(6)}°`
+                    : 'No reliable centroid';
+                const offset = Number.isFinite(sample.displacementArcsec)
+                    ? sample.displacementArcsec < 1e-9 ? 'Reference' : `${sample.displacementArcsec.toFixed(3)}″`
+                    : '—';
+                const brightness = Number.isFinite(sample.brightnessMjySr) ? sample.brightnessMjySr.toExponential(3) : '—';
+                const wavelength = Number.isFinite(sample.wavelengthUm) ? `${sample.wavelengthUm.toFixed(3)} μm` : '—';
+                return `<tr class="border-t border-slate-800"><td class="whitespace-nowrap p-1.5">${escapeHtml(date)}</td><td class="whitespace-nowrap p-1.5 font-mono">${escapeHtml(coordinate)}</td><td class="p-1.5">${escapeHtml(offset)}</td><td class="p-1.5 font-mono">${escapeHtml(brightness)}</td><td class="p-1.5">${escapeHtml(wavelength)}</td><td class="whitespace-nowrap p-1.5">${escapeHtml(sample.observationId)}</td></tr>`;
+            }).join('');
+        }
+
+        function exportEpochAnalysisCsv() {
+            const result = blinkState.epochAnalysis;
+            if (!result?.samples?.length) return;
+            const columns = ['target', 'detector', 'observation_id', 'release', 'epoch_utc', 'ra_centroid_deg', 'dec_centroid_deg', 'east_offset_arcsec', 'north_offset_arcsec', 'displacement_arcsec_from_first', 'local_brightness_excess_MJy_sr', 'wavelength_um'];
+            const csvValue = value => {
+                const safeValue = typeof value === 'number' && !Number.isFinite(value) ? '' : value ?? '';
+                return `"${String(safeValue).replace(/"/g, '""')}"`;
+            };
+            const rows = result.samples.map(sample => [
+                result.targetName, sample.detector, sample.observationId, sample.collection,
+                new Date(sample.timestamp).toISOString(), sample.ra, sample.dec,
+                sample.eastOffsetArcsec, sample.northOffsetArcsec, sample.displacementArcsec,
+                sample.brightnessMjySr, sample.wavelengthUm
+            ].map(csvValue).join(','));
+            const safeName = result.targetName.replace(/[^a-z0-9_-]+/gi, '-');
+            downloadBlob(`${safeName}-${result.detector}-epoch-analysis.csv`, new Blob([`${columns.join(',')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }));
         }
 
         function renderBlinkBandOptions() {
@@ -1784,6 +2210,7 @@
             blinkState.error = '';
             blinkState.progress = 'Searching IRSA for calibrated image cutouts…';
             blinkState.frames = [];
+            clearEpochAnalysis('Searching IRSA for cutouts. Epoch analysis becomes available after at least two frames load.');
             blinkState.index = 0;
             blinkState.progressCompleted = 0;
             blinkState.progressTotal = 0;
@@ -1812,6 +2239,7 @@
                 if (blinkState.requestId !== requestId || appState.currentTarget !== target) return;
                 if (!result.success) throw new Error(result.error || 'SPHEREx cutout request failed.');
                 blinkState.frames = result.frames;
+                syncEpochAnalysisDetectorOptions();
                 blinkState.status = 'loaded';
                 blinkState.error = '';
                 blinkState.progress = result.cached ? 'Loaded cutouts from the local cache.' : '';
@@ -1838,6 +2266,327 @@
                 document.getElementById('blinkCanvasStatus').textContent = `Cutout unavailable: ${error.message}`;
                 updateBlinkControls();
             }
+        }
+
+        function renderTimeComparisonTargetResults(searchText = '') {
+            const container = document.getElementById('timeComparisonTargetResults');
+            if (!container) return;
+            const examples = ['Barnards-Star', 'Epsilon-Indi-B', 'WISE-0855', 'RW-Aurigae', 'R-Draconis']
+                .map(id => presetTargets.find(target => target.id === id))
+                .filter(Boolean)
+                .map(target => target.id === 'WISE-0855'
+                    ? { ...target, ra: 133.79512917, dec: -7.24514722 }
+                    : target);
+            const query = String(searchText || '').trim().toLowerCase();
+            const matches = examples.filter(target => !query
+                || `${target.name} ${target.type || ''} ${target.desc || ''} ${target.chem || ''}`.toLowerCase().includes(query));
+            container.replaceChildren();
+            if (!matches.length) {
+                const message = document.createElement('p');
+                message.className = 'rounded border border-slate-800 p-2 text-[11px] text-slate-500';
+                message.textContent = 'No sample target matches that term. Use “Resolve name and load” to look it up online.';
+                container.appendChild(message);
+                return;
+            }
+            matches.forEach(target => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'block w-full rounded border border-slate-800 p-2 text-left hover:border-cyan-700 hover:bg-slate-900';
+                const name = document.createElement('span');
+                name.className = 'block text-xs font-semibold text-cyan-200';
+                name.textContent = target.name;
+                const type = document.createElement('span');
+                type.className = 'mt-0.5 block text-[10px] text-slate-500';
+                type.textContent = `${target.type || 'Sky target'} · ${target.ra.toFixed(5)}°, ${target.dec.toFixed(5)}°`;
+                button.append(name, type);
+                button.addEventListener('click', () => { void selectTimeComparisonTarget(target); });
+                container.appendChild(button);
+            });
+        }
+
+        async function selectTimeComparisonTarget(target) {
+            document.getElementById('timeComparisonNameSearch').value = target.name;
+            let selected = target;
+            let positionSource = 'app reference coordinates';
+            if (target.id === 'WISE-0855') {
+                selected = { ...target, ra: 133.79512917, dec: -7.24514722 };
+                positionSource = 'the precise coordinates supplied for WISE 0855';
+            }
+            if (target.id !== 'WISE-0855' && window.spherexAPI?.resolveObject) {
+                try {
+                    const resolverName = target.id === 'Epsilon-Indi-B'
+                        ? 'Epsilon Indi B'
+                        : target.name;
+                    const resolved = await window.spherexAPI.resolveObject(resolverName);
+                    if (resolved?.success && Number.isFinite(resolved.ra) && Number.isFinite(resolved.dec)
+                        && resolved.source !== 'Internal Catalog') {
+                        selected = { ...target, name: resolved.name || target.name, ra: resolved.ra, dec: resolved.dec };
+                        positionSource = `live ${resolved.source} name resolution`;
+                    }
+                } catch (error) {
+                    console.warn('[Time comparison] Name resolution failed; using the visible sample coordinates.', error.message);
+                }
+            }
+            document.getElementById('timeComparisonRa').value = Number(selected.ra).toFixed(8);
+            document.getElementById('timeComparisonDec').value = Number(selected.dec).toFixed(8);
+            timeComparisonState.selectedTarget = selected;
+            timeComparisonState.coordinateNote = `Coordinates from ${positionSource}; SPHEREx image matches are fetched live from IRSA.`;
+            document.getElementById('timeComparisonSearchStatus').textContent = `${target.name} selected. ${positionSource}.`;
+            await loadTimeComparisonFrames();
+        }
+
+        async function resolveTimeComparisonTargetName() {
+            const query = document.getElementById('timeComparisonNameSearch').value.trim();
+            const status = document.getElementById('timeComparisonSearchStatus');
+            const button = document.getElementById('timeComparisonResolveNameBtn');
+            if (!query) {
+                status.textContent = 'Type an object or field name to resolve it.';
+                return;
+            }
+            if (!window.spherexAPI?.resolveObject) {
+                status.textContent = 'Live name resolution is available in the Electron app.';
+                return;
+            }
+            button.disabled = true;
+            status.textContent = `Resolving “${query}”…`;
+            try {
+                const result = await window.spherexAPI.resolveObject(query);
+                if (!result?.success || !Number.isFinite(result.ra) || !Number.isFinite(result.dec)) {
+                    throw new Error(result?.error || 'No coordinates were returned for that name.');
+                }
+                document.getElementById('timeComparisonNameSearch').value = result.name || query;
+                document.getElementById('timeComparisonRa').value = Number(result.ra).toFixed(8);
+                document.getElementById('timeComparisonDec').value = Number(result.dec).toFixed(8);
+                timeComparisonState.selectedTarget = { ...result, name: result.name || query };
+                timeComparisonState.coordinateNote = result.source === 'Internal Catalog'
+                    ? 'Name matched an app reference coordinate; SPHEREx image availability is still checked live.'
+                    : `Position resolved by ${result.source || 'the online name resolver'}; SPHEREx images are fetched live.`;
+                status.textContent = `${result.name || query} resolved to ${Number(result.ra).toFixed(6)}°, ${Number(result.dec).toFixed(6)}°.`;
+                await loadTimeComparisonFrames();
+            } catch (error) {
+                status.textContent = `Could not resolve “${query}”: ${error.message}`;
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function propagateGaiaMotionToYear(motion, year) {
+            if (!motion || !Number.isFinite(motion.ra) || !Number.isFinite(motion.dec)
+                || !Number.isFinite(motion.pmra) || !Number.isFinite(motion.pmdec)
+                || !Number.isFinite(motion.refEpoch)) return null;
+            const years = year - motion.refEpoch;
+            const cosDec = Math.cos(motion.dec * Math.PI / 180);
+            const raOffset = cosDec === 0 ? 0 : motion.pmra * years / (3600000 * cosDec);
+            return {
+                ra: (motion.ra + raOffset + 360) % 360,
+                dec: Math.max(-90, Math.min(90, motion.dec + motion.pmdec * years / 3600000))
+            };
+        }
+
+        function findTimeComparisonMotion(ra, dec, selectedTarget) {
+            if (selectedTarget?.isField || /field|galaxy|nebula|cluster/i.test(selectedTarget?.type || '')) return null;
+            const current = appState.currentTarget;
+            const loadedMotion = appState.targetMotionState === 'loaded' ? appState.targetMotion : null;
+            if (loadedMotion && current && (
+                angularSeparationDegrees(ra, dec, current.ra, current.dec) <= 3 / 3600
+                || (selectedTarget?.name && selectedTarget.name.toLowerCase() === current.name?.toLowerCase())
+            )) {
+                return { ...loadedMotion };
+            }
+
+            // Reuse actual Gaia DR3 rows already loaded for the selected field.
+            // Match both the catalog epoch and common J2000/2010 target epochs so
+            // high proper motion stars are not rejected for having moved since
+            // their published reference coordinates.
+            const matches = appState.realData
+                .filter(source => source.source === 'Gaia DR3' && Number.isFinite(source.pmra)
+                    && Number.isFinite(source.pmdec) && Number.isFinite(source.refEpoch))
+                .map(source => {
+                    const motion = { ra: source.ra, dec: source.dec, pmra: source.pmra,
+                        pmdec: source.pmdec, refEpoch: source.refEpoch };
+                    const epochs = [source.refEpoch, 2000, 2010];
+                    const separation = Math.min(...epochs.map(epoch => {
+                        const position = propagateGaiaMotionToYear(motion, epoch);
+                        return position ? angularSeparationDegrees(ra, dec, position.ra, position.dec) : Infinity;
+                    }));
+                    return { motion, separation };
+                })
+                .sort((left, right) => left.separation - right.separation);
+            return matches[0]?.separation <= 3 / 3600 ? matches[0].motion : null;
+        }
+
+        async function loadTimeComparisonFrames() {
+            const ra = Number(document.getElementById('timeComparisonRa').value);
+            const dec = Number(document.getElementById('timeComparisonDec').value);
+            const status = document.getElementById('timeComparisonStatus');
+            const loadButton = document.getElementById('timeComparisonLoadBtn');
+            if (!Number.isFinite(ra) || ra < 0 || ra >= 360 || !Number.isFinite(dec) || dec < -90 || dec > 90) {
+                status.textContent = 'Enter RA from 0° to less than 360° and Dec from −90° to +90°.';
+                return;
+            }
+            if (!window.spherexAPI?.loadCutouts) {
+                status.textContent = 'Live SPHEREx image loading is available in the Electron app.';
+                return;
+            }
+            const requestId = ++timeComparisonState.requestId;
+            const motion = findTimeComparisonMotion(ra, dec, timeComparisonState.selectedTarget);
+            const target = {
+                ra, dec,
+                name: document.getElementById('timeComparisonNameSearch').value.trim() || `RA ${ra.toFixed(5)}°, Dec ${dec.toFixed(5)}°`,
+                motion
+            };
+            timeComparisonState.target = target;
+            timeComparisonState.loading = true;
+            if (timeComparisonState.timer) clearInterval(timeComparisonState.timer);
+            timeComparisonState.timer = null;
+            timeComparisonState.frames = [];
+            timeComparisonState.index = 0;
+            loadButton.disabled = true;
+            const trackingNote = motion
+                ? ' Gaia DR3 proper motion will be applied per image epoch.'
+                : ' No matching Gaia DR3 proper motion is loaded; comparing the fixed sky coordinate.';
+            status.textContent = `Searching the live SPHEREx archive for this target at each epoch and reading calibrated FITS images…${trackingNote}${timeComparisonState.coordinateNote ? ` ${timeComparisonState.coordinateNote}` : ''}`;
+            drawTimeComparisonFrame();
+            updateTimeComparisonControls();
+            try {
+                const result = await window.spherexAPI.loadCutouts({
+                    ra,
+                    dec,
+                    motion,
+                    collection: document.getElementById('timeComparisonRelease').value,
+                    detector: document.getElementById('timeComparisonDetector').value,
+                    frameLimit: 12,
+                    requestId: `time-comparison-${requestId}`
+                });
+                if (requestId !== timeComparisonState.requestId) return;
+                if (!result?.success) throw new Error(result?.error || 'No SPHEREx observations could be loaded for these coordinates.');
+                timeComparisonState.frames = result.frames.slice().sort((left, right) => left.timestamp - right.timestamp);
+                timeComparisonState.index = 0;
+                const partialFailures = result.failures?.length
+                    ? ` ${result.failures.length} image read${result.failures.length === 1 ? '' : 's'} failed.`
+                    : '';
+                status.textContent = `${timeComparisonState.frames.length} real SPHEREx image epoch${timeComparisonState.frames.length === 1 ? '' : 's'} loaded${result.cached ? ' from local cache' : ' from archive'}${partialFailures}`;
+            } catch (error) {
+                if (requestId !== timeComparisonState.requestId) return;
+                status.textContent = `Could not load SPHEREx observations: ${error.message}`;
+            } finally {
+                if (requestId === timeComparisonState.requestId) {
+                    timeComparisonState.loading = false;
+                    loadButton.disabled = false;
+                    drawTimeComparisonFrame();
+                    updateTimeComparisonControls();
+                }
+            }
+        }
+
+        function drawTimeComparisonFrame() {
+            const canvas = document.getElementById('timeComparisonCanvas');
+            if (!canvas) return;
+            const context = canvas.getContext('2d');
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const width = Math.max(1, canvas.clientWidth);
+            const height = Math.max(1, canvas.clientHeight);
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            context.setTransform(dpr, 0, 0, dpr, 0, 0);
+            context.fillStyle = '#030712';
+            context.fillRect(0, 0, width, height);
+            const frames = timeComparisonState.frames;
+            const metadata = document.getElementById('timeComparisonFrameMetadata');
+            if (!frames.length) {
+                metadata.textContent = timeComparisonState.loading ? 'Loading live SPHEREx image data…' : 'No SPHEREx images loaded.';
+                context.fillStyle = '#94a3b8';
+                context.textAlign = 'center';
+                context.font = '15px Inter, sans-serif';
+                context.fillText(timeComparisonState.loading ? 'Reading calibrated observations…' : 'Enter sky coordinates, then load available SPHEREx observations.', width / 2, height / 2);
+                return;
+            }
+            timeComparisonState.index = Math.max(0, Math.min(frames.length - 1, timeComparisonState.index));
+            const rawFrame = frames[timeComparisonState.index];
+            const pixelScales = frames.map(frame => frame.pixelScaleArcsec).filter(scale => Number.isFinite(scale) && scale > 0).sort((a, b) => a - b);
+            const outputScale = pixelScales.length ? pixelScales[Math.floor(pixelScales.length / 2)] : NaN;
+            const target = timeComparisonState.target;
+            const frameEpoch = Number.isFinite(rawFrame.timestamp)
+                ? 2000 + (rawFrame.timestamp - Date.UTC(2000, 0, 1, 12)) / (365.25 * 86400000)
+                : NaN;
+            const framePosition = Number.isFinite(frameEpoch) && target?.motion
+                ? propagateGaiaMotionToYear(target.motion, frameEpoch)
+                : null;
+            const frameTarget = framePosition ? { ...target, ...framePosition } : target;
+            const frame = registerBlinkFrame(rawFrame, frameTarget, outputScale);
+            const bitmap = makeCutoutBitmap(frame, frames, 'normal');
+            if (bitmap) {
+                const size = Math.max(1, Math.min(width, height) * 0.86);
+                context.imageSmoothingEnabled = false;
+                context.drawImage(bitmap, (width - size) / 2, (height - size) / 2, size, size);
+                if (frame.wcsRegistered) {
+                    context.strokeStyle = 'rgba(103,232,249,.7)';
+                    context.lineWidth = 1;
+                    context.beginPath();
+                    context.moveTo(width / 2 - 12, height / 2);
+                    context.lineTo(width / 2 + 12, height / 2);
+                    context.moveTo(width / 2, height / 2 - 12);
+                    context.lineTo(width / 2, height / 2 + 12);
+                    context.stroke();
+                }
+            } else {
+                context.fillStyle = '#fbbf24';
+                context.textAlign = 'center';
+                context.font = '14px Inter, sans-serif';
+                context.fillText('This observation does not contain displayable image pixels.', width / 2, height / 2);
+            }
+            const date = Number.isFinite(rawFrame.timestamp) ? new Date(rawFrame.timestamp).toISOString() : 'Date unavailable';
+            metadata.textContent = `${date} UTC · ${rawFrame.detector || 'Array unavailable'} · ${Number.isFinite(rawFrame.wavelengthUm) ? `${rawFrame.wavelengthUm.toFixed(3)} μm` : 'Band unavailable'} · ${rawFrame.observationId || 'Observation ID unavailable'}${target?.motion ? ' · Gaia DR3 motion tracked' : ''}${frame.wcsRegistered ? '' : ' · WCS alignment unavailable'}`;
+        }
+
+        function updateTimeComparisonControls() {
+            const frames = timeComparisonState.frames;
+            const index = timeComparisonState.index;
+            const hasFrames = frames.length > 0;
+            const scrubber = document.getElementById('timeComparisonScrubber');
+            scrubber.max = String(Math.max(0, frames.length - 1));
+            scrubber.value = String(Math.max(0, Math.min(index, frames.length - 1)));
+            scrubber.disabled = !hasFrames;
+            document.getElementById('timeComparisonPrevBtn').disabled = !hasFrames || index <= 0;
+            document.getElementById('timeComparisonNextBtn').disabled = !hasFrames || index >= frames.length - 1;
+            document.getElementById('timeComparisonPlayBtn').disabled = frames.length < 2;
+            document.getElementById('timeComparisonEpochLabel').textContent = hasFrames ? `${index + 1} / ${frames.length}` : 'No epochs';
+            document.getElementById('timeComparisonPlayBtn').textContent = timeComparisonState.timer ? '❚❚ Pause' : '▶ Play';
+        }
+
+        function setTimeComparisonFrame(index) {
+            if (!timeComparisonState.frames.length) return;
+            timeComparisonState.index = Math.max(0, Math.min(timeComparisonState.frames.length - 1, index));
+            drawTimeComparisonFrame();
+            updateTimeComparisonControls();
+        }
+
+        function toggleTimeComparisonPlayback() {
+            if (timeComparisonState.timer) {
+                clearInterval(timeComparisonState.timer);
+                timeComparisonState.timer = null;
+            } else if (timeComparisonState.frames.length > 1) {
+                if (timeComparisonState.index >= timeComparisonState.frames.length - 1) timeComparisonState.index = 0;
+                timeComparisonState.timer = setInterval(() => {
+                    if (timeComparisonState.index >= timeComparisonState.frames.length - 1) {
+                        clearInterval(timeComparisonState.timer);
+                        timeComparisonState.timer = null;
+                        updateTimeComparisonControls();
+                        return;
+                    }
+                    timeComparisonState.index += 1;
+                    drawTimeComparisonFrame();
+                    updateTimeComparisonControls();
+                }, Number(document.getElementById('timeComparisonSpeed').value));
+            }
+            updateTimeComparisonControls();
+        }
+
+        function closeTimeComparison() {
+            if (timeComparisonState.timer) clearInterval(timeComparisonState.timer);
+            timeComparisonState.timer = null;
+            updateTimeComparisonControls();
+            closeAppDialog(document.getElementById('timeComparisonOverlay'));
         }
 
         function getColorForPixel(value, min, max, palette, difference = false) {
@@ -2381,6 +3130,18 @@
         document.getElementById('detectCandidatesBtn').addEventListener('click', detectBlinkCandidates);
         document.getElementById('downloadBlinkPngBtn').addEventListener('click', downloadBlinkPng);
         document.getElementById('reportDiscoveryBtn').addEventListener('click', downloadDiscoveryReport);
+        document.getElementById('analyzeEpochsBtn').addEventListener('click', analyzeLoadedEpochs);
+        document.getElementById('epochAnalysisDetector').addEventListener('change', () => {
+            if (blinkState.epochAnalysis) analyzeLoadedEpochs();
+        });
+        document.getElementById('exportEpochAnalysisBtn').addEventListener('click', exportEpochAnalysisCsv);
+        document.getElementById('blinkBand').addEventListener('change', () => {
+            if (blinkState.epochAnalysis) analyzeLoadedEpochs();
+        });
+        window.addEventListener('resize', () => {
+            if (blinkState.epochAnalysis) renderEpochAnalysis();
+            if (!document.getElementById('timeComparisonOverlay').classList.contains('hidden')) drawTimeComparisonFrame();
+        });
         document.getElementById('measureMotionBtn').addEventListener('click', () => {
             blinkState.measuring = true;
             blinkState.measurementPoints = [];
@@ -2561,7 +3322,6 @@
                 resizeStarCanvas();
             }
             initCanvas();
-            displayResults(presetTargets);
             void loadSpherexArchiveCatalog();
 
             const params = new URLSearchParams(window.location.search);
@@ -3154,7 +3914,7 @@
             const gaiaGalaxies = gaiaSources.filter(source => source.catalogClass === 'Galaxy').length;
             const gaiaQuasars = gaiaSources.filter(source => source.catalogClass === 'Quasar').length;
             targetDetails.push(
-                `Gaia DR3 rows currently loaded: ${gaiaSources.length} (${gaiaStars} star candidates, ${gaiaGalaxies} galaxy candidates, ${gaiaQuasars} quasar candidates). These are counts in the app's returned query subset only: it requests at most 500 rows ordered by random_index from a rectangular coordinate bound, then filters those rows to ${backgroundRadiusDegrees}° in the renderer. This is not a complete field census or a study sample size. Classifier probabilities are not definitive identifications.`
+                `Gaia DR3 rows currently plotted: ${gaiaSources.length} (${gaiaStars} star candidates, ${gaiaGalaxies} galaxy candidates, ${gaiaQuasars} quasar candidates). These are the real coordinates returned by a query capped at 500 sources within a ${backgroundRadiusDegrees}° cone. This is not a complete field census or a study sample size. Classifier probabilities are not definitive identifications.`
             );
             const mentionedGaiaIds = [...new Set(
                 appState.chatMessages
@@ -3196,6 +3956,18 @@
                 targetDetails.push('No calibrated SPHEREx DR1 or QR3 detector images covering the selected coordinate were found. QR2 is no longer searchable in IRSA.');
             } else if (appState.spectrumState === 'error') {
                 targetDetails.push(`SPHEREx measured pixel-spectrum data are unavailable: ${appState.spectrumError}`);
+            }
+            if (blinkState.epochAnalysis?.samples?.length) {
+                const measured = blinkState.epochAnalysis.samples;
+                const positions = measured.filter(sample => Number.isFinite(sample.ra) && Number.isFinite(sample.dec));
+                const brightnesses = measured.map(sample => sample.brightnessMjySr).filter(Number.isFinite);
+                const motionText = positions.length >= 2
+                    ? `Measured centroid displacement from first to last valid epoch: ${positions.at(-1).displacementArcsec.toFixed(3)} arcsec.`
+                    : 'Fewer than two valid image centroids were measured.';
+                const brightnessText = brightnesses.length
+                    ? `Local background-subtracted surface-brightness excess range: ${Math.min(...brightnesses).toExponential(3)} to ${Math.max(...brightnesses).toExponential(3)} MJy/sr.`
+                    : 'No valid brightness measurements were returned.';
+                targetDetails.push(`Quick-look SPHEREx epoch analysis for ${blinkState.epochAnalysis.detector}: ${measured.length} exposure cutouts. ${motionText} ${brightnessText} These are image-centroid and local-aperture estimates, not PSF-fitted astrometry or calibrated point-source photometry; account for wavelength, quality flags, and image registration before drawing scientific conclusions.`);
             }
             context.push(`Active study context:\n${targetDetails.join('\n')}`);
             return context.join('\n\n');
@@ -3349,7 +4121,7 @@
             const cy = h / 2;
 
             let hoveredObj = null;
-            const scale = Math.min(w, h) / (2 * backgroundRadiusDegrees);
+            const scale = getStarPlotGeometry(w, h).scale;
 
             // Prefer a SIMBAD match when it overlaps the Gaia source for the same star.
             if (appState.realData) {
@@ -3448,6 +4220,11 @@
                 x: centerX + raOffset * decScale * scale,
                 y: centerY - (obj.dec - target.dec) * scale
             };
+        }
+
+        function getStarPlotGeometry(width, height) {
+            const radius = Math.max(1, Math.min(width, height) / 2 - 8);
+            return { cx: width / 2, cy: height / 2, radius, scale: radius / backgroundRadiusDegrees };
         }
 
         function angularSeparationDegrees(ra1, dec1, ra2, dec2) {
@@ -3581,7 +4358,46 @@
         }
 
         function parseGaiaResponse(responseText, center) {
-            const payload = safeUnpackResponse(responseText);
+            let payload = safeUnpackResponse(responseText);
+            if (payload?.getElementsByTagName) {
+                const table = payload.getElementsByTagName('TABLE')[0];
+                const fields = Array.from(table?.getElementsByTagName('FIELD') || [])
+                    .map(field => (field.getAttribute('name') || field.getAttribute('ID') || '').toLowerCase());
+                const rows = Array.from(table?.getElementsByTagName('TR') || []).map(row =>
+                    Array.from(row.getElementsByTagName('TD')).map((cell, index) => {
+                        const value = cell.textContent.trim();
+                        if (!value || value.toLowerCase() === 'null') return null;
+                        return fields[index] === 'source_id' ? value : (Number.isFinite(Number(value)) ? Number(value) : value);
+                    })
+                );
+                payload = { metadata: fields.map(name => ({ name })), data: rows };
+            }
+            if (typeof payload === 'string' && !payload.trim().startsWith('<')) {
+                const parseCsvLine = line => {
+                    const values = [];
+                    let value = '';
+                    let quoted = false;
+                    for (let i = 0; i < line.length; i += 1) {
+                        if (line[i] === '"') {
+                            if (quoted && line[i + 1] === '"') { value += '"'; i += 1; }
+                            else quoted = !quoted;
+                        } else if (line[i] === ',' && !quoted) { values.push(value.trim()); value = ''; }
+                        else value += line[i];
+                    }
+                    values.push(value.trim());
+                    return values;
+                };
+                const rows = payload.trim().split(/\r?\n/).map(parseCsvLine);
+                if (rows.length > 1) {
+                    const fields = rows.shift().map(field => field.replace(/^"|"$/g, '').toLowerCase());
+                    payload = {
+                        metadata: fields.map(name => ({ name })),
+                        data: rows.filter(row => row.length === fields.length).map(row => row.map((value, index) => (
+                            fields[index] === 'source_id' ? value.replace(/^"|"$/g, '') : (value === '' || value.toLowerCase() === 'null' ? null : Number(value))
+                        )))
+                    };
+                }
+            }
             if (!payload || !Array.isArray(payload.metadata) || !Array.isArray(payload.data)) {
                 throw new Error('Gaia TAP response did not contain a result table.');
             }
@@ -3615,7 +4431,7 @@
                     ? NaN
                     : Number(row[index])
             );
-            const sources = payload.data.map(row => {
+            let sources = payload.data.map(row => {
                 const probabilities = probabilityFields
                     .map(([label, index]) => ({ label, probability: numberAt(row, index) }))
                     .filter(item => Number.isFinite(item.probability));
@@ -3648,7 +4464,7 @@
                 return {
                     ra: Number(row[raIndex]),
                     dec: Number(row[decIndex]),
-                    mag: Number.isFinite(numberAt(row, magnitudeIndex)) ? numberAt(row, magnitudeIndex) : 20,
+                    mag: numberAt(row, magnitudeIndex),
                     gMag: numberAt(row, magnitudeIndex),
                     type: catalogClass === 'Quasar'
                         ? 'Quasar candidate'
@@ -3676,10 +4492,12 @@
                     classificationDetail
                 };
             }).filter(source => Number.isFinite(source.ra) && Number.isFinite(source.dec));
-            if (!center) return sources;
-            return sources.filter(source => (
+            if (center) sources = sources.filter(source => (
                 angularSeparationDegrees(center.ra, center.dec, source.ra, source.dec) <= center.radius
             ));
+            // Plot the archive-returned source coordinates unchanged. No generated
+            // positions or client-side random source selection is applied.
+            return sources;
         }
 
         function parseSpherexResponse(rawResponse, center) {
@@ -3716,7 +4534,6 @@
                     dec: Number(item.s_dec ?? item.dec),
                     mjdStart: Number(item.t_min ?? item.time_bounds_lower ?? item.mjdStart ?? item.mjd),
                     mjdEnd: Number(item.t_max ?? item.time_bounds_upper ?? item.mjdEnd ?? item.mjd),
-                    mag: 18,
                     type: item.obs_collection || item.collection || 'SPHEREx',
                     source: 'SPHEREx',
                     name: item.obs_id || item.observationid || item.name || 'SPHEREx',
@@ -3748,7 +4565,6 @@
                     dec,
                     mjdStart,
                     mjdEnd,
-                    mag: 18,
                     type,
                     source: 'SPHEREx',
                     name,
@@ -3879,7 +4695,6 @@
                     dec,
                     name: identifier.replace(/^NAME\s+/i, ''),
                     catalogId: row[indexes.mainId],
-                    mag: 4,
                     type: 'Named star',
                     classification: row[indexes.spectralType] || 'Spectral type unavailable in SIMBAD',
                     source: 'SIMBAD',
@@ -3998,11 +4813,113 @@
         }
 
         let liveSpherexTargets = [];
+        let onlineCatalogTargets = [];
+        let onlineCatalogRequestId = 0;
+        const spherexCoverageCache = new Map();
+        let activeSpherexCoverage = { key: '', state: 'idle', rows: [], error: '' };
+
+        const simbadTypeSearches = {
+            galaxy: ['G'], galaxies: ['G'],
+            quasar: ['QSO'], quasars: ['QSO'],
+            nebula: ['Neb', 'HII', 'PN'], nebulas: ['Neb', 'HII', 'PN'], nebulae: ['Neb', 'HII', 'PN'],
+            supernova: ['SNR', 'SN*'], supernovae: ['SNR', 'SN*'],
+            star: ['*'], stars: ['*'],
+            variable: ['V*'], 'variable star': ['V*'], 'variable stars': ['V*'],
+            'brown dwarf': ['BD*'], 'brown dwarfs': ['BD*'],
+            dwarf: ['BD*', 'WD*'], dwarfs: ['BD*', 'WD*'], 'white dwarf': ['WD*'], 'white dwarfs': ['WD*'],
+            'globular cluster': ['GlC'], 'globular clusters': ['GlC'],
+            'open cluster': ['OpC'], 'open clusters': ['OpC'],
+            pulsar: ['Psr'], pulsars: ['Psr'], 'black hole': ['BH'], 'black holes': ['BH']
+        };
+
+        function buildSimbadTargetQuery(rawQuery = '') {
+            const term = rawQuery.trim().replace(/[%_]/g, ' ').replace(/\s+/g, ' ').replace(/'/g, "''");
+            const normalized = term.toLowerCase();
+            const typeCodes = Object.prototype.hasOwnProperty.call(simbadTypeSearches, normalized)
+                ? simbadTypeSearches[normalized]
+                : null;
+            let condition;
+            if (typeCodes) {
+                condition = `b.otype IN (${typeCodes.map(code => `'${code}'`).join(', ')})`;
+            } else if (!term) {
+                // A broad, ranked sample of real SIMBAD objects for the initial browse list.
+                condition = "b.otype IN ('G', 'QSO', 'Neb', 'SNR', 'GlC', 'HII', 'PN', 'SyG', 'EmG')";
+            } else {
+                const pattern = `%${term}%`;
+                condition = `(b.main_id LIKE '${pattern}' OR i.id LIKE '${pattern}')`;
+                return `SELECT TOP 100 b.main_id, b.ra, b.dec, b.otype, b.sp_type, b.plx_value, b.plx_err FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE ${condition} ORDER BY b.nbref DESC`;
+            }
+            return `SELECT TOP 100 b.main_id, b.ra, b.dec, b.otype, b.sp_type, b.plx_value, b.plx_err FROM basic AS b WHERE ${condition} ORDER BY b.nbref DESC`;
+        }
+
+        function parseSimbadTargetCatalog(responseText) {
+            const rawText = typeof responseText === 'string'
+                ? responseText
+                : (responseText?.data && typeof responseText.data === 'string' ? responseText.data : String(responseText || ''));
+            const lines = rawText.trim().split(/\r?\n/);
+            if (lines.length < 2) return [];
+            const parseCsvRow = line => {
+                const values = [];
+                let value = '';
+                let quoted = false;
+                for (let i = 0; i < line.length; i += 1) {
+                    const character = line[i];
+                    if (character === '"') {
+                        if (quoted && line[i + 1] === '"') { value += '"'; i += 1; }
+                        else quoted = !quoted;
+                    } else if (character === ',' && !quoted) { values.push(value); value = ''; }
+                    else value += character;
+                }
+                values.push(value);
+                return values;
+            };
+            const fields = parseCsvRow(lines[0]).map(field => field.trim().toLowerCase());
+            const column = name => fields.indexOf(name);
+            const indexes = {
+                name: column('main_id'), ra: column('ra'), dec: column('dec'), type: column('otype'),
+                spectralType: column('sp_type'), parallax: column('plx_value'), parallaxError: column('plx_err')
+            };
+            if ([indexes.name, indexes.ra, indexes.dec, indexes.type].some(index => index < 0)) {
+                throw new Error('SIMBAD target response is missing object identifiers or coordinates.');
+            }
+            const targets = new Map();
+            for (const line of lines.slice(1)) {
+                const row = parseCsvRow(line);
+                const name = row[indexes.name]?.trim();
+                const raText = row[indexes.ra]?.trim();
+                const decText = row[indexes.dec]?.trim();
+                const ra = Number(raText);
+                const dec = Number(decText);
+                if (!name || !raText || !decText || !Number.isFinite(ra) || !Number.isFinite(dec) || ra < 0 || ra >= 360 || dec < -90 || dec > 90) continue;
+                const otype = row[indexes.type]?.trim() || 'Object';
+                const spectralType = indexes.spectralType >= 0 ? row[indexes.spectralType]?.trim() : '';
+                const typeLabels = { G: 'Galaxy', QSO: 'Quasar', Neb: 'Nebula', SNR: 'Supernova remnant', 'SN*': 'Supernova', GlC: 'Globular cluster', OpC: 'Open cluster', HII: 'H II region', PN: 'Planetary nebula', SyG: 'Seyfert galaxy', EmG: 'Emission-line galaxy', '*': spectralType ? `Star (${spectralType})` : 'Star', 'BD*': 'Brown dwarf', 'WD*': 'White dwarf', 'V*': 'Variable star', Psr: 'Pulsar', BH: 'Black hole' };
+                const target = {
+                    id: `SIMBAD-${name}`,
+                    name,
+                    ra,
+                    dec,
+                    type: typeLabels[otype] || spectralType || otype,
+                    catalogSource: 'SIMBAD',
+                    catalogId: otype,
+                    isField: false,
+                    desc: `Live SIMBAD catalog result. Object type: ${otype}.${spectralType ? ` Spectral type: ${spectralType}.` : ''} SPHEREx archive coverage is checked separately for this position.`
+                };
+                targets.set(name.toLowerCase(), target);
+            }
+            return [...targets.values()];
+        }
+
+        async function loadOnlineCatalogTargets(query = '') {
+            // Primary results come from the SPHEREx archive. SIMBAD is queried
+            // separately as a background-object overlay around the selected field.
+            await loadSpherexArchiveCatalog(query);
+        }
 
         async function loadSpherexArchiveCatalog() {
             if (!window.spherexAPI?.queryTAP) return;
             try {
-                const query = `SELECT TOP 12 obs_id, s_ra, s_dec, obs_collection, t_min, t_max FROM spherex.obscore WHERE obs_collection IS NOT NULL ORDER BY t_min DESC`;
+                const query = `SELECT TOP 100 obs_id, s_ra, s_dec, obs_collection, t_min, t_max FROM spherex.obscore WHERE obs_collection IN ('spherex_dr1', 'spherex_qr3')`;
                 const response = await window.spherexAPI.queryTAP({ adqlQuery: query });
                 if (!response?.success) return;
                 const observations = parseSpherexResponse(response.data);
@@ -4030,7 +4947,7 @@
 
                 const currentSearch = document.getElementById('searchInput')?.value.trim();
                 if (!currentSearch) {
-                    displayResults([...presetTargets, ...liveSpherexTargets]);
+                    displayResults(liveSpherexTargets);
                 }
             } catch (err) {
                 console.warn('SPHEREx archive catalog load notice:', err.message);
@@ -4043,6 +4960,25 @@
             const obsCount = spherexSources ? spherexSources.length : 0;
             const releases = [...new Set((spherexSources || []).map(s => s.type).filter(Boolean))].join(', ') || appState.collection.toUpperCase();
             const obsIds = (spherexSources || []).slice(0, 3).map(s => s.name).join(', ');
+            const coverageKey = `${Number(target.ra).toFixed(6)},${Number(target.dec).toFixed(6)}`;
+            const coverage = activeSpherexCoverage.key === coverageKey ? activeSpherexCoverage : { state: 'idle', rows: [], error: '' };
+            const detectorCounts = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6']
+                .map(detector => `${detector}: ${coverage.rows.filter(row => row.detector === detector).length}`);
+            const coverageDates = coverage.rows.flatMap(row => [row.mjdStart, row.mjdEnd]).filter(Number.isFinite)
+                .map(mjd => new Date((mjd - 40587) * 86400000)).filter(date => Number.isFinite(date.getTime())).sort((a, b) => a - b);
+            const coverageDateRange = coverageDates.length
+                ? ` · ${coverageDates[0].toISOString().slice(0, 10)}–${coverageDates.at(-1).toISOString().slice(0, 10)}`
+                : '';
+            const coverageReleases = [...new Set(coverage.rows.map(row => row.collection).filter(Boolean))].join(', ');
+            const coverageSummary = coverage.state === 'loading'
+                ? 'Checking calibrated DR1/QR3 detector products in IRSA…'
+                : coverage.state === 'error'
+                    ? `Coverage query unavailable: ${coverage.error}`
+                    : coverage.state === 'loaded'
+                        ? coverage.rows.length
+                            ? `${coverage.rows.length}${coverage.rows.length >= 500 ? '+' : ''} real detector-product rows · ${coverageReleases} · ${detectorCounts.join(' · ')}${coverageDateRange}`
+                            : 'No calibrated DR1/QR3 detector products cover this position.'
+                        : 'Check live DR1/QR3 coverage by detector array.';
             content.innerHTML = `
                 <div><strong>Name:</strong> <span class="text-cyan-400 font-bold">${escapeHtml(target.name)}</span></div>
                 <div><strong>Type:</strong> ${escapeHtml(target.type || 'SPHEREx Target')}</div>
@@ -4056,9 +4992,116 @@
                     <div class="text-slate-300"><strong>Observations:</strong> ${obsCount > 0 ? `${obsCount} calibrated observations in IRSA` : 'Coverage check complete'}</div>
                     ${obsIds ? `<div class="text-slate-400 font-mono text-[10px]"><strong>Observation IDs:</strong> ${escapeHtml(obsIds)}${obsCount > 3 ? ` (+${obsCount - 3} more)` : ''}</div>` : ''}
                     <div class="text-slate-300"><strong>Dated Epochs:</strong> ${appState.observationEpochs.length} epoch(s) on timeline</div>
+                    <div class="mt-2 border-t border-slate-800 pt-2">
+                        <div class="text-slate-300"><strong>Detector coverage:</strong> ${escapeHtml(coverageSummary)}</div>
+                        <div class="mt-1 flex flex-wrap gap-2">
+                            <button id="checkSpherexCoverageBtn" type="button" class="rounded border border-cyan-800 px-2 py-1 text-[10px] text-cyan-200 hover:bg-cyan-950" ${coverage.state === 'loading' ? 'disabled' : ''}>${coverage.state === 'loading' ? 'Checking…' : 'Check array coverage'}</button>
+                            ${coverage.state === 'loaded' && coverage.rows.length ? '<button id="exportSpherexCoverageBtn" type="button" class="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-200 hover:bg-slate-800">Export coverage CSV</button>' : ''}
+                        </div>
+                        ${coverage.state === 'loaded' && coverage.rows.length >= 500 ? '<div class="mt-1 text-[9px] text-amber-300">IRSA response is capped at 500 products; the full coverage may be larger.</div>' : ''}
+                    </div>
                 </div>
                 <div class="pt-2 text-slate-400 italic text-xs">${escapeHtml(target.desc || '')}</div>
             `;
+            document.getElementById('checkSpherexCoverageBtn')?.addEventListener('click', () => { void checkSpherexArrayCoverage(target); });
+            document.getElementById('exportSpherexCoverageBtn')?.addEventListener('click', () => exportSpherexCoverageCsv(target));
+        }
+
+        function parseSpherexCoverageRows(rawResponse) {
+            const payload = safeUnpackResponse(rawResponse);
+            let fields = [];
+            let rows = [];
+            if (Array.isArray(payload?.metadata) && Array.isArray(payload?.data)) {
+                fields = payload.metadata.map(field => String(field.name || '').toLowerCase());
+                rows = payload.data;
+            } else if (payload?.getElementsByTagName) {
+                fields = Array.from(payload.getElementsByTagName('FIELD')).map(field => (field.getAttribute('name') || '').toLowerCase());
+                rows = Array.from(payload.getElementsByTagName('TR')).map(row => Array.from(row.getElementsByTagName('TD')).map(cell => cell.textContent.trim()));
+            } else {
+                const table = payload?.VOTABLE?.RESOURCE_ARRAY?.[0]?.TABLE || payload?.RESOURCE?.[0]?.TABLE || payload?.TABLE;
+                if (table) {
+                    fields = (table.FIELD_ARRAY || table.FIELD || []).map(field => String(field['<xmlattr>']?.name || field.name || '').toLowerCase());
+                    const tableData = table.DATA?.TABLEDATA || table.DATA;
+                    rows = Array.isArray(tableData) ? tableData : (tableData?.TR || []);
+                }
+            }
+            const index = name => fields.indexOf(name);
+            const indexes = {
+                id: index('observationid') >= 0 ? index('observationid') : index('obsid'),
+                detector: index('energy_bandpassname'),
+                start: index('time_bounds_lower'),
+                end: index('time_bounds_upper'),
+                collection: index('collection') >= 0 ? index('collection') : index('obs_collection')
+            };
+            if ([indexes.id, indexes.detector, indexes.start, indexes.end, indexes.collection].some(value => value < 0)) {
+                throw new Error('IRSA response did not contain detector, release, observation ID, and time columns.');
+            }
+            const valueAt = (row, field) => String(Array.isArray(row) ? row[field] ?? '' : row?.[field] ?? '').trim();
+            return rows.map(row => {
+                const band = valueAt(row, indexes.detector);
+                const start = Number(valueAt(row, indexes.start));
+                const end = Number(valueAt(row, indexes.end));
+                const detector = band.match(/D[1-6]/i)?.[0]?.toUpperCase() || '';
+                return {
+                    observationId: valueAt(row, indexes.id),
+                    detector,
+                    bandpass: band,
+                    mjdStart: start,
+                    mjdEnd: end,
+                    collection: valueAt(row, indexes.collection)
+                };
+            }).filter(row => row.observationId && row.detector && Number.isFinite(row.mjdStart) && Number.isFinite(row.mjdEnd));
+        }
+
+        async function checkSpherexArrayCoverage(target) {
+            if (!target || !window.spherexAPI?.queryTAP) return;
+            const key = `${Number(target.ra).toFixed(6)},${Number(target.dec).toFixed(6)}`;
+            const cached = spherexCoverageCache.get(key);
+            if (cached && cached.expiresAt > Date.now()) {
+                activeSpherexCoverage = { key, state: 'loaded', rows: cached.rows, error: '' };
+                updatePanelWithRealSpherexMetadata(target, appState.realData.filter(source => source.source === 'SPHEREx'));
+                return;
+            }
+            activeSpherexCoverage = { key, state: 'loading', rows: [], error: '' };
+            updatePanelWithRealSpherexMetadata(target, appState.realData.filter(source => source.source === 'SPHEREx'));
+            const queryId = `${Date.now()}-${Math.random()}`;
+            activeSpherexCoverage.queryId = queryId;
+            const query = `SELECT TOP 500 o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, o.collection FROM spherex.plane AS p JOIN spherex.observation AS o ON p.obsid = o.obsid JOIN spherex.artifact AS a ON p.planeid = a.planeid WHERE o.collection IN ('spherex_dr1', 'spherex_qr3') AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname IN ('SPHEREx-D1', 'SPHEREx-D2', 'SPHEREx-D3', 'SPHEREx-D4', 'SPHEREx-D5', 'SPHEREx-D6') AND 1 = CONTAINS(POINT('ICRS', ${Number(target.ra)}, ${Number(target.dec)}), p.poly) ORDER BY p.time_bounds_lower DESC`;
+            try {
+                const response = await window.spherexAPI.queryTAP({ adqlQuery: query });
+                if (activeSpherexCoverage.queryId !== queryId || appState.currentTarget !== target) return;
+                if (!response?.success) throw new Error(response?.error || 'IRSA TAP query failed.');
+                const coverageRows = parseSpherexCoverageRows(response.data);
+                spherexCoverageCache.set(key, { rows: coverageRows, expiresAt: Date.now() + 5 * 60 * 1000 });
+                activeSpherexCoverage = { key, state: 'loaded', rows: coverageRows, error: '' };
+            } catch (error) {
+                if (activeSpherexCoverage.queryId !== queryId) return;
+                activeSpherexCoverage = { key, state: 'error', rows: [], error: error.message };
+            }
+            if (appState.currentTarget === target) {
+                updatePanelWithRealSpherexMetadata(target, appState.realData.filter(source => source.source === 'SPHEREx'));
+            }
+        }
+
+        function exportSpherexCoverageCsv(target) {
+            const key = `${Number(target?.ra).toFixed(6)},${Number(target?.dec).toFixed(6)}`;
+            const rows = activeSpherexCoverage.key === key ? activeSpherexCoverage.rows : [];
+            if (!rows.length) return;
+            const columns = ['target_name', 'target_ra_deg', 'target_dec_deg', 'observation_id', 'release', 'detector', 'energy_bandpass', 'start_utc', 'end_utc', 'start_mjd', 'end_mjd'];
+            const csvValue = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+            const csv = [columns.join(','), ...rows.map(row => {
+                const iso = mjd => {
+                    const date = Number.isFinite(mjd) ? new Date((mjd - 40587) * 86400000) : null;
+                    return date && Number.isFinite(date.getTime()) ? date.toISOString() : '';
+                };
+                return [target.name, target.ra, target.dec, row.observationId, row.collection, row.detector, row.bandpass, iso(row.mjdStart), iso(row.mjdEnd), row.mjdStart, row.mjdEnd].map(csvValue).join(',');
+            })].join('\r\n');
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `spherex-coverage-${(target.name || 'target').replace(/[^a-z0-9_-]+/gi, '-')}.csv`;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 0);
         }
 
         function fetchRealData(ra, dec, requestId) {
@@ -4076,7 +5119,7 @@
             const spherexBounds = getConeSearchBounds(ra, dec, radius, 's_ra');
             const gaiaBounds = getConeSearchBounds(ra, dec, radius);
             const spherexQuery = `SELECT TOP 20 s_ra, s_dec, s_region, obs_id, obs_collection, t_min, t_max FROM spherex.obscore WHERE (LOWER(obs_collection) LIKE '%dr1%' OR LOWER(obs_collection) LIKE '%qr3%' OR obs_collection = '${appState.collection}') AND s_dec BETWEEN ${spherexBounds.decMin} AND ${spherexBounds.decMax}${spherexBounds.raCondition}`;
-            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} ORDER BY random_index`;
+            const gaiaQuery = `SELECT TOP 500 source_id, ra, dec, pmra, pmdec, ref_epoch, parallax, parallax_error, phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, classprob_dsc_combmod_star, classprob_dsc_combmod_galaxy, classprob_dsc_combmod_quasar FROM gaiadr3.gaia_source WHERE dec BETWEEN ${gaiaBounds.decMin} AND ${gaiaBounds.decMax}${gaiaBounds.raCondition} AND 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radius}))`;
             const simbadQuery = `SELECT TOP 500 b.oid, b.main_id, i.id, b.ra, b.dec, b.plx_value, b.plx_err, b.sp_type FROM basic AS b JOIN ident AS i ON i.oidref = b.oid WHERE 1=CONTAINS(POINT('ICRS', b.ra, b.dec), CIRCLE('ICRS', ${ra}, ${dec}, ${radius})) AND b.sp_type IS NOT NULL AND i.id LIKE 'NAME %'`;
 
             if (supportsGaiaProperMotion(appState.currentTarget)) {
@@ -4116,6 +5159,7 @@
         // ── Search helper variables ───────────────────────────────────────────
         let searchDebounceTimer = null;
         let searchHighlightIndex = -1;
+        let activeTargetSearchId = 0;
 
         function handleSearchDebounced() {
             const input = document.getElementById('searchInput');
@@ -4127,12 +5171,13 @@
         }
 
         function clearSearchInput() {
+            activeTargetSearchId += 1;
             const input = document.getElementById('searchInput');
             const clearBtn = document.getElementById('clearSearchBtn');
             input.value = '';
             if (clearBtn) clearBtn.classList.add('hidden');
             searchHighlightIndex = -1;
-            displayResults([...presetTargets, ...liveSpherexTargets]);
+            void loadOnlineCatalogTargets();
             input.focus();
         }
 
@@ -4204,9 +5249,10 @@
         }
 
         async function handleSearch() {
+            const searchId = ++activeTargetSearchId;
             const rawQuery = document.getElementById('searchInput').value.trim();
             if (!rawQuery) {
-                displayResults([...presetTargets, ...liveSpherexTargets]);
+                void loadOnlineCatalogTargets();
                 return;
             }
 
@@ -4234,6 +5280,8 @@
                             new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
                         ]).catch(() => null);
 
+                        if (searchId !== activeTargetSearchId) return;
+
                         if (res?.success) {
                             const spherexMatches = parseSpherexResponse(res.data, { ra: coords.ra, dec: coords.dec, radius: 0.35 });
                             if (spherexMatches.length > 0) {
@@ -4258,44 +5306,9 @@
                 return;
             }
 
-            // 2. Immediate local fuzzy search (Instant 0ms feedback)
-            const query = rawQuery.toLowerCase();
-            const allLocal = [...presetTargets, ...liveSpherexTargets];
-            const queryTokens = query.split(/\s+/).filter(Boolean);
-            const localMatches = allLocal.map(item => {
-                let score = 0;
-                const name = item.name.toLowerCase();
-                const desc = (item.desc || '').toLowerCase();
-                const obsId = (item.obsId || '').toLowerCase();
-                const type = (item.type || '').toLowerCase();
-                const chem = (item.chem || '').toLowerCase();
-                const id = (item.id || '').toLowerCase();
-                // Exact / prefix match on name or obsId — highest priority
-                if (name === query || obsId === query || id === query) score += 10;
-                else if (name.startsWith(query) || obsId.startsWith(query)) score += 7;
-                // Substring match in name/obsId
-                if (name.includes(query)) score += 5;
-                else if (obsId.includes(query) || id.includes(query)) score += 4;
-                // Keyword match in type/chem/desc — powers "galaxy", "dwarf", "nebula", "variable", "water", "methane"
-                if (type.includes(query)) score += 4;
-                if (chem.includes(query)) score += 3;
-                if (desc.includes(query)) score += 2;
-                // Token-level fuzzy: each word of a multi-word query that matches adds 1 pt
-                for (const token of queryTokens) {
-                    if (token.length >= 3 && (name.includes(token) || type.includes(token) || chem.includes(token) || desc.includes(token))) score += 1;
-                }
-                return { ...item, score };
-            }).filter(item => item.score > 0).sort((a, b) => b.score - a.score);
-
-            if (localMatches.length > 0) {
-                // Instantly display local matches so the user is never stuck
-                displayResults(localMatches);
-                openDetails(localMatches[0]);
-            } else {
-                container.innerHTML = `<div class="p-3 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Searching SPHEREx archive & astronomical databases for "${escapeHtml(rawQuery)}"…</div>`;
-            }
-
-            // 3. Remote live queries with strict 3-second timeout
+            // Search SPHEREx archive observations. SIMBAD remains an independent
+            // background overlay and is never used to populate primary target results.
+            container.innerHTML = `<div class="p-3 text-xs text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Searching live SPHEREx archive data for "${escapeHtml(rawQuery)}"…</div>`;
             try {
                 const withTimeout = (p, ms = 3000) => Promise.race([
                     p,
@@ -4304,7 +5317,6 @@
 
                 const safeQuery = rawQuery.replace(/'/g, "''");
                 const isObsIdQuery = /^[\w-]{3,}$/i.test(safeQuery) && (/\d/.test(safeQuery) || /^spherex/i.test(safeQuery) || /^(?:dr1|qr[23])/i.test(safeQuery));
-
                 const tapPromise = (isObsIdQuery && window.spherexAPI?.queryTAP) ? (async () => {
                     try {
                         const tapQuery = `SELECT TOP 10 obs_id, s_ra, s_dec, obs_collection, t_min, t_max FROM spherex.obscore WHERE obs_id LIKE '%${safeQuery}%' OR obs_collection LIKE '%${safeQuery}%' ORDER BY t_min DESC`;
@@ -4325,64 +5337,55 @@
                 })() : Promise.resolve(null);
 
                 const [directTapObs, sesameRes] = await Promise.all([tapPromise, sesamePromise]);
+                if (searchId !== activeTargetSearchId) return;
 
-                const finalResults = [...localMatches];
-                const seenKeys = new Set(finalResults.map(item => `${Number(item.ra).toFixed(3)},${Number(item.dec).toFixed(3)}`));
-
-                // If CDS Sesame resolved celestial coordinates
-                if (sesameRes?.success && Number.isFinite(sesameRes.ra) && Number.isFinite(sesameRes.dec)) {
-                    const resolvedTarget = createSkyMapTarget(
-                        sesameRes.name || rawQuery,
-                        sesameRes.ra,
-                        sesameRes.dec,
-                        'Resolved Object'
-                    );
-                    resolvedTarget.desc = `Position resolved via ${sesameRes.source || 'CDS Sesame'} (${sesameRes.ra.toFixed(4)}°, ${sesameRes.dec.toFixed(4)}°).`;
-
-                    const key = `${resolvedTarget.ra.toFixed(3)},${resolvedTarget.dec.toFixed(3)}`;
-                    if (!seenKeys.has(key)) {
-                        seenKeys.add(key);
-                        finalResults.unshift(resolvedTarget);
-                    }
+                const presetMatch = presetTargets.find(preset =>
+                    rawQuery.toLowerCase().split(/\s+/).every(token =>
+                        preset.name.toLowerCase().includes(token)
+                        || preset.id.toLowerCase().replace(/-/g, ' ').includes(token)
+                    )
+                );
+                const searchCenter = sesameRes?.success && Number.isFinite(sesameRes.ra) && Number.isFinite(sesameRes.dec)
+                    ? { ra: sesameRes.ra, dec: sesameRes.dec }
+                    : presetMatch ? { ra: presetMatch.ra, dec: presetMatch.dec } : null;
+                let spatialTapObs = [];
+                let archiveQueryError = '';
+                if (searchCenter && window.spherexAPI?.queryTAP) {
+                    const coneQuery = `SELECT TOP 100 obs_id, s_ra, s_dec, obs_collection, t_min, t_max FROM spherex.obscore WHERE 1=CONTAINS(POINT('ICRS', s_ra, s_dec), CIRCLE('ICRS', ${searchCenter.ra}, ${searchCenter.dec}, 0.35))`;
+                    const response = await withTimeout(window.spherexAPI.queryTAP({ adqlQuery: coneQuery }), 12000);
+                    if (searchId !== activeTargetSearchId) return;
+                    if (response?.success) {
+                        spatialTapObs = parseSpherexResponse(response.data, { ...searchCenter, radius: 0.35 });
+                    } else archiveQueryError = response?.error || 'IRSA TAP query failed.';
                 }
 
-                // If direct TAP observations matched
-                if (directTapObs && directTapObs.length > 0) {
-                    for (const obs of directTapObs) {
-                        const key = `${obs.ra.toFixed(3)},${obs.dec.toFixed(3)}`;
-                        if (!seenKeys.has(key)) {
-                            seenKeys.add(key);
-                            const target = createSkyMapTarget(
-                                `SPHEREx Obs ${obs.name}`,
-                                obs.ra,
-                                obs.dec,
-                                obs.type || 'SPHEREx Observation'
-                            );
-                            target.obsId = obs.name;
-                            target.collection = obs.type;
-                            target.mjdStart = obs.mjdStart;
-                            target.mjdEnd = obs.mjdEnd;
-                            target.desc = `Direct SPHEREx IRSA observation ${obs.name} (${obs.type}) at RA ${obs.ra.toFixed(4)}°, Dec ${obs.dec.toFixed(4)}°.`;
-                            finalResults.push(target);
-                        }
-                    }
-                }
+                const uniqueObs = new Map();
+                [...(directTapObs || []), ...spatialTapObs].forEach(obs => uniqueObs.set(obs.name, obs));
+                const finalResults = [...uniqueObs.values()].map(obs => {
+                    const target = createSkyMapTarget(`SPHEREx Obs ${obs.name}`, obs.ra, obs.dec, obs.type || 'SPHEREx Observation');
+                    target.id = `SPHEREx-${obs.name}`;
+                    target.obsId = obs.name;
+                    target.collection = obs.type;
+                    target.mjdStart = obs.mjdStart;
+                    target.mjdEnd = obs.mjdEnd;
+                    target.desc = `Live SPHEREx IRSA archive observation (${obs.type || 'collection unavailable'}). RA ${obs.ra.toFixed(4)}°, Dec ${obs.dec.toFixed(4)}°.`;
+                    return target;
+                });
 
                 if (finalResults.length > 0) {
                     displayResults(finalResults);
-                    if (localMatches.length === 0) {
-                        openDetails(finalResults[0]);
-                    }
+                    openDetails(finalResults[0]);
+                } else if (presetMatch) {
+                    displayResults([presetMatch]);
+                    openDetails(presetMatch);
+                    container.insertAdjacentHTML('afterbegin', `<div class="p-3 text-xs text-amber-300">Known reference target. ${archiveQueryError ? `Live archive query failed: ${escapeHtml(archiveQueryError)}` : 'No live SPHEREx observation was returned for its field.'} The bundled target is shown for context, not as an archive result.</div>`);
                 } else {
-                    container.innerHTML = `<div class="p-3 text-xs text-amber-300">No matching targets found for "${escapeHtml(rawQuery)}". Enter coordinates (e.g. 150.119, 2.2058) or a known star name.</div>`;
+                    container.innerHTML = `<div class="p-3 text-xs text-amber-300">No SPHEREx archive observations matched "${escapeHtml(rawQuery)}". Try an observation ID, object name, or coordinates; SIMBAD and Gaia remain available as background overlays.</div>`;
                 }
             } catch (err) {
+                if (searchId !== activeTargetSearchId) return;
                 console.warn('Search processing notice:', err.message);
-                if (localMatches.length > 0) {
-                    displayResults(localMatches);
-                } else {
-                    container.innerHTML = `<div class="p-3 text-xs text-amber-300">Could not resolve "${escapeHtml(rawQuery)}". Enter coordinates like 150.119, 2.2058 or a star name.</div>`;
-                }
+                container.innerHTML = `<div class="p-3 text-xs text-amber-300">Could not search online catalogs for "${escapeHtml(rawQuery)}". Check your internet connection and try again.</div>`;
             }
         }
 
@@ -4405,9 +5408,10 @@
                         <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800">${escapeHtml(obj.type || 'Target')}</span>
                     </div>
                     <div class="text-[11px] text-slate-400 mt-1 font-mono">RA ${Number(obj.ra).toFixed(3)}° · Dec ${Number(obj.dec).toFixed(3)}°</div>
+                    ${obj.catalogSource ? `<div class="text-[10px] text-cyan-300 mt-0.5">Live ${escapeHtml(obj.catalogSource)} catalog target</div>` : presetTargets.some(preset => preset.id === obj.id) ? '<div class="text-[10px] text-amber-300 mt-0.5">Curated reference shortcut · not a live measurement</div>' : ''}
                     ${obj.obsId ? `<div class="text-[10px] text-emerald-400 font-mono mt-0.5"><i class="fa-solid fa-satellite-dish mr-1"></i>SPHEREx ${escapeHtml(obj.collection || '')}: ${escapeHtml(obj.obsId)}</div>` : ''}
-                    ${obj.dist ? `<div class="text-[11px] text-cyan-400/80 mt-0.5">${escapeHtml(obj.dist)}</div>` : ''}
-                    ${obj.chem ? `<div class="text-[10px] text-violet-400/70 mt-0.5 truncate"><i class="fa-solid fa-flask-vial mr-1"></i>${escapeHtml(obj.chem)}</div>` : ''}
+                    ${obj.dist ? `<div class="text-[11px] text-cyan-400/80 mt-0.5">Reference distance: ${escapeHtml(obj.dist)}</div>` : ''}
+                    ${obj.chem ? `<div class="text-[10px] text-violet-300/80 mt-0.5 truncate"><i class="fa-solid fa-flask-vial mr-1"></i>Curated literature context: ${escapeHtml(obj.chem)}</div>` : ''}
                 `;
                 container.appendChild(card);
             });
@@ -4420,6 +5424,7 @@
             blinkState.playing = false;
             blinkState.requestId = `${Date.now()}-${Math.random()}`;
             blinkState.frames = [];
+            clearEpochAnalysis();
             blinkState.index = 0;
             blinkState.status = 'idle';
             blinkState.error = '';
@@ -4432,7 +5437,9 @@
             if (skyMapReady) goToSkyCoordinates(obj.ra, obj.dec);
             const content = document.getElementById('panelContent');
             if (content) {
+                const isCuratedPreset = presetTargets.some(preset => preset.id === obj.id);
                 content.innerHTML = `
+                    ${isCuratedPreset ? '<div class="mb-2 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-200">Curated reference target. Its shortcut summary is bundled; live catalog and SPHEREx archive measurements load separately below.</div>' : ''}
                     <div><strong>Name:</strong> <span class="text-cyan-400">${escapeHtml(obj.name)}</span></div>
                     <div><strong>Type:</strong> ${escapeHtml(obj.type)}</div>
                     <div><strong>RA:</strong> ${escapeHtml(obj.ra)}°</div>
@@ -4487,13 +5494,51 @@
             syncViewUrl();
         }
 
-        // Simple constellation lookup (based on RA/Dec ranges - simplified mapping)
+        const constellationNames = {
+            And: 'Andromeda', Ant: 'Antlia', Aps: 'Apus', Aqr: 'Aquarius', Aql: 'Aquila', Ara: 'Ara',
+            Ari: 'Aries', Aur: 'Auriga', Boo: 'Boötes', Cae: 'Caelum', Cam: 'Camelopardalis', Cnc: 'Cancer',
+            CVn: 'Canes Venatici', CMa: 'Canis Major', CMi: 'Canis Minor', Cap: 'Capricornus', Car: 'Carina',
+            Cas: 'Cassiopeia', Cen: 'Centaurus', Cep: 'Cepheus', Cet: 'Cetus', Cha: 'Chamaeleon', Cir: 'Circinus',
+            Col: 'Columba', Com: 'Coma Berenices', CrA: 'Corona Australis', CrB: 'Corona Borealis', Crv: 'Corvus',
+            Crt: 'Crater', Cru: 'Crux', Cyg: 'Cygnus', Del: 'Delphinus', Dor: 'Dorado', Dra: 'Draco',
+            Equ: 'Equuleus', Eri: 'Eridanus', For: 'Fornax', Gem: 'Gemini', Gru: 'Grus', Her: 'Hercules',
+            Hor: 'Horologium', Hya: 'Hydra', Hyi: 'Hydrus', Ind: 'Indus', Lac: 'Lacerta', Leo: 'Leo',
+            LMi: 'Leo Minor', Lep: 'Lepus', Lib: 'Libra', Lup: 'Lupus', Lyn: 'Lynx', Lyr: 'Lyra',
+            Men: 'Mensa', Mic: 'Microscopium', Mon: 'Monoceros', Mus: 'Musca', Nor: 'Norma', Oct: 'Octans',
+            Oph: 'Ophiuchus', Ori: 'Orion', Pav: 'Pavo', Peg: 'Pegasus', Per: 'Perseus', Phe: 'Phoenix',
+            Pic: 'Pictor', Psc: 'Pisces', PsA: 'Piscis Austrinus', Pup: 'Puppis', Pyx: 'Pyxis', Ret: 'Reticulum',
+            Sge: 'Sagitta', Sgr: 'Sagittarius', Sco: 'Scorpius', Scl: 'Sculptor', Sct: 'Scutum', Ser: 'Serpens',
+            Sex: 'Sextans', Tau: 'Taurus', Tel: 'Telescopium', Tri: 'Triangulum', TrA: 'Triangulum Australe',
+            Tuc: 'Tucana', UMa: 'Ursa Major', UMi: 'Ursa Minor', Vel: 'Vela', Vir: 'Virgo', Vol: 'Volans', Vul: 'Vulpecula'
+        };
+
+        function pointInConstellationRing(ra, dec, ring) {
+            const referenceLongitude = ring[0][0];
+            const unwrapLongitude = longitude => referenceLongitude + (((longitude - referenceLongitude + 540) % 360) - 180);
+            const queryLongitude = unwrapLongitude(ra);
+            let inside = false;
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const xi = unwrapLongitude(ring[i][0]);
+                const yi = ring[i][1];
+                const xj = unwrapLongitude(ring[j][0]);
+                const yj = ring[j][1];
+                if ((yi > dec) !== (yj > dec) && queryLongitude < ((xj - xi) * (dec - yi)) / (yj - yi) + xi) inside = !inside;
+            }
+            return inside;
+        }
+
+        // Resolve the J2000 IAU constellation region from bundled boundary polygons.
         function getConstellation(ra, dec) {
-            // Simplified approximation for demonstration
-            if (ra > 180 && ra < 210 && dec > -20 && dec < 20) return "Virgo";
-            if (ra > 260 && ra < 280 && dec > -10 && dec < 10) return "Ophiuchus";
-            if (ra > 70 && ra < 90 && dec > 10 && dec < 40) return "Auriga";
-            return "Unknown";
+            if (!Number.isFinite(ra) || !Number.isFinite(dec) || dec < -90 || dec > 90) return 'Unknown';
+            const normalizedRa = ((ra % 360) + 360) % 360;
+            const polygons = window.ASTERIA_CONSTELLATION_BOUNDARIES?.features || [];
+            for (const feature of polygons) {
+                const rings = feature.geometry?.type === 'Polygon' ? feature.geometry.coordinates : [];
+                if (rings.length && pointInConstellationRing(normalizedRa, dec, rings[0])) {
+                    return constellationNames[feature.id] || feature.id || 'Unknown';
+                }
+            }
+            return 'Unknown';
         }
 
         function plotStarAndSurroundings(target) {
@@ -4502,26 +5547,29 @@
             const h = starCanvas.height;
             starCtx.clearRect(0, 0, w, h);
 
-            // Draw Background Grid
-            starCtx.strokeStyle = '#1e293b';
-            starCtx.lineWidth = 0.5;
-            for(let x=0; x<w; x+=30) {
-                starCtx.beginPath(); starCtx.moveTo(x,0); starCtx.lineTo(x,h); starCtx.stroke();
-            }
-            for(let y=0; y<h; y+=30) {
-                starCtx.beginPath(); starCtx.moveTo(0,y); starCtx.lineTo(w,y); starCtx.stroke();
-            }
+            const { cx, cy, radius, scale } = getStarPlotGeometry(w, h);
+            starCtx.save();
+            starCtx.beginPath();
+            starCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            starCtx.clip();
 
-            const cx = w / 2;
-            const cy = h / 2;
-            const scale = Math.min(w, h) / (2 * backgroundRadiusDegrees);
+            // Draw a circular sky field with radial rings and crosshairs.
+            starCtx.strokeStyle = '#1e293b';
+            starCtx.lineWidth = 0.7;
+            for (const fraction of [0.25, 0.5, 0.75, 1]) {
+                starCtx.beginPath();
+                starCtx.arc(cx, cy, radius * fraction, 0, Math.PI * 2);
+                starCtx.stroke();
+            }
+            starCtx.beginPath(); starCtx.moveTo(cx - radius, cy); starCtx.lineTo(cx + radius, cy); starCtx.stroke();
+            starCtx.beginPath(); starCtx.moveTo(cx, cy - radius); starCtx.lineTo(cx, cy + radius); starCtx.stroke();
 
             // Plot catalogue sources using their Gaia DR3 classification.
             appState.realData.forEach(obj => {
                 const { x, y } = getBackgroundPixelPosition(obj, target, cx, cy, scale);
-                const magnitude = Number.isFinite(Number(obj.mag)) ? Number(obj.mag) : 18;
+                const magnitude = obj.mag !== null && obj.mag !== '' && Number.isFinite(Number(obj.mag)) ? Number(obj.mag) : 18;
                 const size = obj.source === 'Gaia DR3'
-                    ? Math.max(1.2, Math.min(3.2, 4 - (magnitude - 12) * 0.2))
+                    ? Math.max(0.7, Math.min(1.5, 1.9 - (magnitude - 12) * 0.08))
                     : 3;
 
                 if (obj.source === 'SPHEREx') {
@@ -4558,7 +5606,7 @@
                     starCtx.closePath();
                     starCtx.fill();
                 } else {
-                    const opacity = Math.max(0.25, Math.min(0.9, 1.1 - (magnitude - 12) * 0.06));
+                    const opacity = Math.max(0.35, Math.min(0.95, 1.05 - (magnitude - 12) * 0.035));
                     starCtx.fillStyle = obj.catalogClass === 'Star'
                         ? `rgba(200, 220, 255, ${opacity})`
                         : `rgba(148, 163, 184, ${opacity})`;
@@ -4567,6 +5615,12 @@
                     starCtx.fill();
                 }
             });
+            starCtx.restore();
+            starCtx.strokeStyle = 'rgba(148, 163, 184, 0.65)';
+            starCtx.lineWidth = 1;
+            starCtx.beginPath();
+            starCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            starCtx.stroke();
 
             starCtx.font = '10px Inter';
             starCtx.textAlign = 'left';
@@ -4684,7 +5738,7 @@
                 
                 skyCtx.font = '12px Inter';
                 skyCtx.fillStyle = '#94a3b8';
-                if (target.chem) skyCtx.fillText('Detected Chemicals: ' + target.chem, 20, 50);
+                if (target.chem) skyCtx.fillText('Curated literature context (not a SPHEREx detection): ' + target.chem, 20, 50);
                 const epoch = appState.observationEpochs[appState.currentEpoch];
                 skyCtx.fillText(epoch
                     ? `SPHEREx observation date: ${formatEpochDate(epoch.timestamp)} (${epoch.observations} observation${epoch.observations === 1 ? '' : 's'})`

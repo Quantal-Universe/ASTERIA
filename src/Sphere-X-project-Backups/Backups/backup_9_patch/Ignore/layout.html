@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Parallax · SPHEREx Sky Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f5f9;--card:#fff;--ink:#1c2540;--mute:#667089;--line:#e4e8f0;--acc:#4f46e5;--accs:#eceafd;--sh:0 1px 3px rgba(28,37,64,.07),0 8px 24px rgba(28,37,64,.05);--sky:#0b1020;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1120;--card:#161c30;--ink:#e8ecf8;--mute:#98a2bf;--line:#263050;--acc:#8b87ff;--accs:#26264d;--sh:0 1px 3px rgba(0,0,0,.4);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1120;--card:#161c30;--ink:#e8ecf8;--mute:#98a2bf;--line:#263050;--acc:#8b87ff;--accs:#26264d;--sh:0 1px 3px rgba(0,0,0,.4);color-scheme:dark}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px}
+#app{display:grid;grid-template-columns:35% minmax(0,1fr) 10vw;height:100%;gap:16px;padding:16px;transition:grid-template-columns .25s}
+#app.col{grid-template-columns:35% minmax(0,1fr) 64px}
+.panel{background:var(--card);border-radius:20px;box-shadow:var(--sh);border:1px solid var(--line);min-height:0;display:flex;flex-direction:column}
+.scroll{overflow:auto;padding:0 18px 18px;flex:1}
+.head{padding:18px}.brand{font-size:26px;font-weight:800;letter-spacing:-.03em;margin:0 0 12px}
+.search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:0 14px;background:var(--bg)}
+.search:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px var(--accs)}
+.search input{flex:1;border:0;background:none;color:var(--ink);font:inherit;padding:11px 0;outline:0;min-width:0}
+svg.i{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+h3{font-size:17px;font-weight:700;margin:16px 0 8px;letter-spacing:-.01em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:0;background:var(--bg);color:var(--ink);padding:7px 13px;border-radius:999px;font:inherit;font-size:13px;cursor:pointer}
+.chip:hover{background:var(--accs)}
+.cards{display:flex;flex-direction:column;gap:12px}
+.card{border:1px solid var(--line);border-radius:16px;padding:14px;display:grid;grid-template-columns:84px 1fr;gap:14px;cursor:pointer;background:var(--card);text-align:left;color:inherit;font:inherit;width:100%}
+.card:hover{box-shadow:var(--sh)}.card.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--accs)}
+.card canvas{width:84px;height:84px;border-radius:12px;background:var(--sky)}
+.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin-bottom:6px}
+.card b{display:block;font-size:16px;font-weight:700}.card small{color:var(--mute);display:block;margin-top:2px;line-height:1.4}
+.note{color:var(--mute);font-size:13px;margin:4px 0 12px}
+.detail{padding:22px;overflow:auto;flex:1}
+.detail h2{font-size:26px;letter-spacing:-.02em;margin:0 0 4px}.sub{color:var(--mute);margin:0 0 18px}
+.row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px}
+@media(max-width:1300px){.row{grid-template-columns:1fr}}
+.view{position:relative;border-radius:16px;overflow:hidden;background:var(--sky);aspect-ratio:1}
+.view canvas{width:100%;height:100%;display:block}
+.hud{position:absolute;left:10px;bottom:10px;background:rgba(10,14,30,.7);color:#fff;border-radius:10px;padding:5px 10px;font-size:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer}
+.btn.on{background:var(--acc);border-color:var(--acc);color:#fff}
+select{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 12px;font:inherit;font-size:13px}
+.strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}.strip canvas{width:64px;height:64px;border-radius:10px;border:2px solid transparent;cursor:pointer;flex:none;background:var(--sky)}
+.strip canvas.on{border-color:var(--acc)}
+.box{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}.box h4{margin:0 0 8px;font-size:14px}
+.box canvas{width:100%;display:block;border-radius:10px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:13px}dt{color:var(--mute)}dd{margin:0;text-align:right;font-weight:500}
+.rail{align-items:center;padding:12px 8px;gap:6px}
+.rb{width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:none;color:var(--mute);padding:12px 4px;border-radius:14px;font:inherit;font-size:12px;cursor:pointer}
+.rb:hover{background:var(--bg)}.rb.on{background:var(--accs);color:var(--acc)}
+#app.col .rb span{display:none}.sp{flex:1}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}.setrow p{margin:2px 0 0;color:var(--mute);font-size:13px}
+.hide{display:none!important}
+.badge{color:var(--acc);font-weight:600;font-size:12px}
+.tl{border-top:1px solid var(--line);padding:14px 18px 16px;background:var(--card);border-radius:0 0 20px 20px}
+.tl-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.tl-top b{font-size:14px}.tl-top span{color:var(--mute);font-size:12px}
+.tl-ctl{display:flex;align-items:center;gap:8px}
+.ib{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}.ib:hover{background:var(--bg)}.ib.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.tl-track{position:relative;flex:1;height:36px;display:flex;align-items:center}
+.tl-track input[type=range]{width:100%;margin:0;accent-color:var(--acc)}
+.tl-ticks{display:flex;justify-content:space-between;color:var(--mute);font-size:11px;margin:4px 0 0 92px;padding-right:0}
+.tl-sel{margin-left:auto}
+@media(max-width:900px){body{overflow:auto}#app,#app.col{display:flex;flex-direction:column;height:auto}.panel{max-height:none}.rail{flex-direction:row;order:-1}.rb span{display:none}}
+</style></head><body>
+<div id="app">
+<aside class="panel" id="left"><div class="head"><h1 class="brand">Parallax</h1>
+<label class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="q" placeholder="Target name or RA, Dec (e.g. 08h55m10.8s -7d14m42s)" autocomplete="off"></label></div>
+<div class="scroll"><div class="chips" id="chips"></div><div id="results"></div></div>
+<div class="tl" id="timeline"><div class="tl-top"><b>Timeline</b><span id="tlLabel">Epoch 1 of 8 · 2025-06-01</span></div>
+<div class="tl-ctl"><button class="ib" id="tlPrev" title="Previous epoch"><svg class="i" viewBox="0 0 24 24"><path d="M19 5v14L8 12zM5 5v14"/></svg></button>
+<button class="ib pri" id="tlPlay" title="Play"><svg class="i" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg></button>
+<button class="ib" id="tlNext" title="Next epoch"><svg class="i" viewBox="0 0 24 24"><path d="M5 5v14l11-7zM19 5v14"/></svg></button>
+<div class="tl-track"><input type="range" id="tlRange" min="0" max="7" value="0" step="1" aria-label="Epoch"></div>
+<select id="tlSpeed" class="tl-sel" aria-label="Speed"><option>0.5×</option><option selected>1×</option><option>2×</option><option>4×</option></select></div>
+<div class="tl-ticks"><span>Jun 2025</span><span>Dec 2025</span><span>Jun 2026</span><span>Oct 2026</span></div></div></aside>
+<main class="panel" id="main"><div class="detail" id="detail"></div>
+<div class="detail hide" id="settings"><h2>Settings</h2><p class="sub">Saved in this browser.</p>
+<div class="setrow"><div><b>Theme</b><p>Choose the default appearance.</p></div><div class="bar" id="themeSeg" style="margin:0"></div></div>
+<div class="setrow"><div><b>Field of view</b><p>Larger fields follow faster movers.</p></div><select id="sFov"></select></div>
+<div class="setrow"><div><b>Playback speed</b><p>Frames per second in blink mode.</p></div><select id="sSpd"></select></div>
+<div class="setrow"><div><b>Color map</b><p>How brightness is drawn.</p></div><select id="sMap"><option value="gray">Grayscale</option><option value="heat">Infrared heat</option></select></div>
+<div class="setrow"><div><b>Show motion track</b><p>Overlay the target's path on the image.</p></div><button class="btn" id="sTrack"></button></div></div></main>
+<nav class="panel rail" id="rail"><button class="rb" id="colBtn" title="Collapse"><svg class="i" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg><span>Collapse</span></button>
+<button class="rb on" data-v="home" title="Home"><svg class="i" viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/></svg><span>Home</span></button>
+<button class="rb" data-v="settings" title="Settings"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg><span>Settings</span></button>
+<div class="sp"></div><button class="rb" id="themeBtn" title="Toggle theme"><svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg><span>Theme</span></button></nav></div>
+<script>
+const $=s=>document.querySelector(s);
+const TARGETS=[
+{n:"Barnard's Star",al:["gj 699","barnard"],ra:269.4521,dec:4.6933,pa:-0.80,pd:10.33,t:"M dwarf",k:"star",d:"Red dwarf six light-years away with the largest known proper motion, about 10.3 arcsec per year. It should visibly drift between SPHEREx visits."},
+{n:"Epsilon Indi B",al:["eps indi","eps ind b","epsilon indi ab"],ra:330.8702,dec:-56.7860,pa:3.96,pd:-2.54,t:"Brown dwarf pair",k:"bd",d:"A pair of brown dwarfs orbiting the star Epsilon Indi A. Cool and bright in the long infrared bands, with methane absorption near 3.3 µm."},
+{n:"WISE 0855-0714",al:["wise 0855","wise0855","w0855"],ra:133.7951,dec:-7.2452,pa:-8.1,pd:0.7,t:"Brown dwarf",k:"bd",d:"RA 08h55m10.831s, Dec −7°14′42.53″. One of the coldest known brown dwarfs, only faintly visible at the shortest wavelengths and fast moving."},
+{n:"RW Aurigae",al:["rw aur"],ra:76.9569,dec:30.4015,pa:0.0,pd:0.0,t:"Variable star",k:"var",per:2.3,d:"A young, irregular variable star. Brightness changes between epochs rather than position."},
+{n:"R Draconis",al:["r dra"],ra:248.1733,dec:66.7550,pa:0.0,pd:0.0,t:"Variable star",k:"var",per:1.1,d:"A Mira-type variable that swells and fades over about 245 days, easy to catch in a time series."}];
+const DET=[[.75,1.09],[1.09,1.62],[1.62,2.41],[2.41,3.82],[3.82,4.42],[4.42,5.0]];
+const S={view:"home",tgt:null,ep:0,det:2,mode:"single",fov:2,speed:3,map:"gray",track:true,theme:"system",play:null,custom:null};
+try{Object.assign(S,JSON.parse(localStorage.getItem("plx")||"{}"));}catch(e){}
+S.play=null;
+const save=()=>{try{localStorage.setItem("plx",JSON.stringify({theme:S.theme,fov:S.fov,speed:S.speed,map:S.map,track:S.track}))}catch(e){}};
+const rng=seed=>()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const EP=Array.from({length:8},(_,i)=>{const d=new Date(Date.UTC(2025,5,1)+i*75*864e5);return{i,date:d.toISOString().slice(0,10),mjd:Math.round(d/864e5+40587),yr:i*75/365.25}});
+const N=128,cache={};
+function fmtRA(d){const h=d/15,m=(h%1)*60,s=(m%1)*60;return`${String(h|0).padStart(2,"0")}h${String(m|0).padStart(2,"0")}m${s.toFixed(1)}s`}
+function fmtDec(d){const a=Math.abs(d),m=(a%1)*60,s=(m%1)*60;return`${d<0?"−":"+"}${a|0}°${String(m|0).padStart(2,"0")}′${s.toFixed(1)}″`}
+function parseCoords(q){let m=q.match(/(\d+)\s*[h: ]\s*(\d+)\s*[m: ]\s*([\d.]+)\s*s?\s*,?\s*([+\-−]?\d+)\s*[d°: ]\s*(\d+)\s*['m: ]\s*([\d.]+)/i);
+if(m){const sg=/^[-−]/.test(m[4])?-1:1;return{ra:15*(+m[1]+m[2]/60+m[3]/3600),dec:sg*(Math.abs(+m[4])+m[5]/60+m[6]/3600)}}
+m=q.match(/^\s*([\d.]+)\s*[, ]\s*([+\-−]?[\d.]+)\s*$/);if(m){const ra=+m[1],dec=+m[2].replace("−","-");if(ra<=360&&Math.abs(dec)<=90)return{ra,dec}}return null}
+function pos(t,e){const sc=S.fov*60/N;return[N/2+(t.pa*(e.yr-.65))/-sc,N/2-(t.pd*(e.yr-.65))/sc]}
+function flux(t,e,d){const r=rng(Math.round(t.ra*1e3)+e.i*7+d);if(t.k==="var")return 90*(1+.6*Math.sin(2*Math.PI*(e.yr/t.per)+t.ra))*(1+d*.05);
+if(t.k==="bd")return[4,10,30,80,180,260][d];return[160,120,90,60,30,16][d]}
+function frame(t,ei,d){const key=[t.n,ei,d,S.fov].join("|");if(cache[key])return cache[key];
+const e=EP[ei],f=new Float32Array(N*N),R=rng(Math.round(t.ra*100+t.dec*10)),Nz=rng(ei*977+d*31+Math.round(t.ra));
+const add=(x,y,a,s=1.4)=>{const r=5|0;for(let j=-r;j<=r;j++)for(let i=-r;i<=r;i++){const px=Math.round(x)+i,py=Math.round(y)+j;if(px<0||py<0||px>=N||py>=N)continue;f[py*N+px]+=a*Math.exp(-((px-x)**2+(py-y)**2)/(2*s*s))}};
+for(let k=0;k<70;k++){add(R()*N,R()*N,(8+R()**4*180)*[1.2,1,.9,.7,.5,.35][d])}
+const[x,y]=pos(t,e);add(x,y,flux(t,e,d),1.5);
+for(let i=0;i<N*N;i++)f[i]+=(Nz()-.5)*6+(Nz()<.002?60:0);
+return cache[key]=f}
+function render(cv,t,ei,d,mode,opts={}){const size=opts.size||N;cv.width=cv.height=N;const c=cv.getContext("2d"),im=c.createImageData(N,N);
+let f=frame(t,ei,d),o=new Float32Array(N*N);
+if(mode==="diff"){const g=frame(t,0,d);for(let i=0;i<o.length;i++)o[i]=f[i]-g[i]+0}
+else if(mode==="sum"){for(let k=0;k<EP.length;k++){const g=frame(t,k,d);for(let i=0;i<o.length;i++)o[i]+=g[i]/EP.length}}else o=f;
+const diff=mode==="diff";
+for(let i=0;i<o.length;i++){let v=o[i];v=diff?.5+.5*Math.asinh(v/25)/Math.asinh(8):Math.asinh(Math.max(v,0)/18)/Math.asinh(12);v=Math.max(0,Math.min(1,v));
+let r=v,g=v,b=v;if(S.map==="heat"){r=Math.min(1,v*1.8);g=Math.max(0,v*1.6-.5);b=Math.max(0,v*2.5-1.6)}
+im.data.set([r*255,g*255,b*255,255],i*4)}
+c.putImageData(im,0,0);
+if(opts.track&&S.track){c.strokeStyle="rgba(255,210,90,.9)";c.fillStyle="rgba(255,210,90,.95)";c.lineWidth=1;c.beginPath();EP.forEach((e,k)=>{const[x,y]=pos(t,e);k?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
+EP.forEach((e,k)=>{const[x,y]=pos(t,e);c.beginPath();c.arc(x,y,k===ei?5:1.8,0,7);k===ei?(c.stroke()):c.fill()})}}
+function allTargets(){return S.custom?[S.custom,...TARGETS]:TARGETS}
+function card(t,x=""){const b=document.createElement("button");b.className="card"+(S.tgt===t?" on":"");b.innerHTML=`<canvas></canvas><div><span class="pill">${t.t}</span>${x}<b>${t.n}</b><small>${fmtRA(t.ra)} ${fmtDec(t.dec)}</small><small>${t.k==="var"?"Brightness varies between epochs":`Moves ${Math.hypot(t.pa,t.pd).toFixed(2)}″ per year`}</small></div>`;
+render(b.querySelector("canvas"),t,3,2,"single");b.onclick=()=>{S.tgt=t;S.ep=0;stop();showView("home");list();detail()};return b}
+function list(){const q=$("#q").value.trim().toLowerCase(),box=$("#results");box.innerHTML="";
+const sec=(title,note,arr,tag)=>{if(!arr.length)return;box.insertAdjacentHTML("beforeend",`<h3>${title}</h3>${note?`<p class="note">${note}</p>`:""}`);const w=document.createElement("div");w.className="cards";arr.forEach(t=>w.append(card(t,tag?`<span class="badge"> ${tag}</span>`:"")));box.append(w)};
+if(!q){sec("All targets",`${allTargets().length} fields ready. Search by name or any coordinates.`,allTargets());return}
+const co=parseCoords(q);
+if(co){const t=S.custom&&S.custom.ra===co.ra&&S.custom.dec===co.dec?S.custom:{n:"Custom field",t:"Coordinates",ra:co.ra,dec:co.dec,pa:0,pd:0,k:"star",d:"Your own patch of sky. Proper motion is unknown, so the track stays still. Use Difference mode to find anything that moved."};S.custom=t;sec("Exact match","Coordinates parsed.",[t]);return}
+const ex=TARGETS.filter(t=>t.n.toLowerCase()===q||t.al.includes(q)),terms=q.split(/\s+/);
+const mt=TARGETS.filter(t=>!ex.includes(t)&&terms.some(w=>[t.n,...t.al,t.t,t.d].join(" ").toLowerCase().includes(w)));
+sec("Exact match","",ex);sec("Matching terms","Names, aliases and descriptions containing your words.",mt);
+if(!ex.length&&!mt.length)box.innerHTML=`<p class="note" id="res">No saved target matches. Resolving “${q}” with CDS Sesame…</p>`}
+async function resolve(q){const el=$("#res");if(!el)return;try{const r=await fetch("https://cds.unistra.fr/cgi-bin/nph-sesame/-oI/SNV?"+encodeURIComponent(q));const m=(await r.text()).match(/%J\s+([\d.]+)\s+([+\-][\d.]+)/);
+if(!m)throw 0;const t={n:q,t:"Resolved name",ra:+m[1],dec:+m[2],pa:0,pd:0,k:"star",d:"Position resolved from CDS Sesame. Proper motion is not included, so use Difference mode to look for movement."};S.custom=t;list()}catch(e){if($("#res"))$("#res").textContent="Couldn't resolve that name. Try coordinates like 133.795, −7.245."}}
+let tm;$("#q").oninput=()=>{list();clearTimeout(tm);tm=setTimeout(()=>resolve($("#q").value.trim()),700)};
+$("#chips").innerHTML=TARGETS.map(t=>`<button class="chip">${t.n}</button>`).join("");
+document.querySelectorAll(".chip").forEach((c,i)=>c.onclick=()=>{$("#q").value=TARGETS[i].n;list()});
+function stop(){clearInterval(S.play);S.play=null}
+function detail(){const t=S.tgt,el=$("#detail");if(!t){el.innerHTML=`<h2>Pick a target</h2><p class="sub">Choose a card on the left, or search any name or coordinates. Each target opens a time series of SPHEREx images you can play like a short video.</p>`;return}
+const e=EP[S.ep],[lo,hi]=DET[S.det];
+el.innerHTML=`<h2>${t.n}</h2><p class="sub">${t.t} · ${fmtRA(t.ra)} ${fmtDec(t.dec)} · ${t.ra.toFixed(4)}°, ${t.dec.toFixed(4)}°</p>
+<div class="row"><div><div class="view"><canvas id="img"></canvas><div class="hud" id="hud"></div></div>
+<div class="bar"><button class="btn on" id="play">${S.play?"Pause":"Play"}</button>
+<select id="mode"><option value="single">Single epoch</option><option value="sum">Sum of all epochs</option><option value="diff">Difference from first</option></select>
+<select id="det">${DET.map((d,i)=>`<option value="${i}">Detector ${i+1} · ${d[0]}–${d[1]} µm</option>`).join("")}</select>
+<select id="fov">${[1,2,4,6].map(v=>`<option value="${v}">${v}′ field</option>`).join("")}</select></div>
+<div class="strip" id="strip"></div></div>
+<div><div class="box"><h4>Location tracker</h4><canvas id="trk" width="360" height="260"></canvas></div>
+<div class="box"><h4>Observation details</h4><dl id="meta"></dl></div></div></div>
+<div class="box" style="margin-top:14px"><h4>About this target</h4><p style="margin:0;line-height:1.55">${t.d}</p></div>
+<div class="box"><h4>Spectrum across 102 bands (illustrative model)</h4><canvas id="spec" width="720" height="200"></canvas></div>`;
+$("#mode").value=S.mode;$("#det").value=S.det;$("#fov").value=S.fov;
+$("#mode").onchange=e=>{S.mode=e.target.value;draw()};$("#det").onchange=e=>{S.det=+e.target.value;draw()};
+$("#fov").onchange=e=>{S.fov=+e.target.value;save();draw()};
+$("#play").onclick=()=>{if(S.play){stop()}else S.play=setInterval(()=>{S.ep=(S.ep+1)%EP.length;draw()},1000/S.speed);$("#play").textContent=S.play?"Pause":"Play"};
+const st=$("#strip");EP.forEach(ep=>{const c=document.createElement("canvas");c.title=ep.date;c.onclick=()=>{S.ep=ep.i;draw()};st.append(c)});
+spec();draw()}
+function draw(){const t=S.tgt;if(!t||!$("#img"))return;const e=EP[S.ep],[lo,hi]=DET[S.det];
+render($("#img"),t,S.ep,S.det,S.mode,{track:true});
+document.querySelectorAll("#strip canvas").forEach((c,i)=>{render(c,t,i,S.det,"single");c.className=i===S.ep?"on":""});
+$("#hud").textContent=`${e.date} · MJD ${e.mjd} · epoch ${S.ep+1}/${EP.length}`;
+const fl=["Clean","Clean","Clean","Stray light","Clean","Cosmic ray masked","Clean","Clean"][S.ep];
+$("#meta").innerHTML=`<dt>Date</dt><dd>${e.date}</dd><dt>MJD</dt><dd>${e.mjd}</dd><dt>Band</dt><dd>${lo}–${hi} µm</dd><dt>Field</dt><dd>${S.fov}′ · ${(S.fov*60/N).toFixed(2)}″ per px</dd><dt>Contamination</dt><dd>${fl}</dd><dt>View mode</dt><dd>${$("#mode").selectedOptions[0].text}</dd>`;
+const c=$("#trk").getContext("2d"),W=360,H=260,cs=getComputedStyle(document.documentElement);c.clearRect(0,0,W,H);
+const ink=cs.getPropertyValue("--ink"),mu=cs.getPropertyValue("--mute"),ln=cs.getPropertyValue("--line"),ac=cs.getPropertyValue("--acc");
+const pts=EP.map(x=>{const p=pos(t,x),sc=S.fov*60/N;return[(p[0]-N/2)*sc,(p[1]-N/2)*sc]});
+const ext=Math.max(4,...pts.flat().map(Math.abs))*1.3,k=(H/2-24)/ext;c.strokeStyle=ln;c.lineWidth=1;c.font="11px Inter,sans-serif";c.fillStyle=mu;
+for(let i=-2;i<=2;i++){c.beginPath();c.moveTo(W/2+i*H/5,10);c.lineTo(W/2+i*H/5,H-10);c.moveTo(W/2-H/2+10,H/2+i*H/5);c.lineTo(W/2+H/2-10,H/2+i*H/5);c.stroke()}
+c.fillText("E ←",12,16);c.fillText("N ↑",W-34,16);c.fillText("Offset in arcsec, ±"+ext.toFixed(0)+"″",12,H-8);
+c.strokeStyle=ac;c.lineWidth=2;c.beginPath();pts.forEach((p,i)=>{const x=W/2+p[0]*k,y=H/2+p[1]*k;i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
+pts.forEach((p,i)=>{c.fillStyle=i===S.ep?ac:mu;c.beginPath();c.arc(W/2+p[0]*k,H/2+p[1]*k,i===S.ep?7:3.5,0,7);c.fill()});}
+function spec(){const t=S.tgt,c=$("#spec").getContext("2d"),W=720,H=200,cs=getComputedStyle(document.documentElement);
+c.clearRect(0,0,W,H);const ac=cs.getPropertyValue("--acc"),mu=cs.getPropertyValue("--mute"),ln=cs.getPropertyValue("--line");
+c.strokeStyle=ln;c.strokeRect(36,8,W-46,H-34);c.fillStyle=mu;c.font="11px Inter,sans-serif";[1,2,3,4,5].forEach(w=>{const x=36+(w-.75)/4.25*(W-46);c.fillText(w+" µm",x-10,H-8)});
+c.strokeStyle=ac;c.lineWidth=2;c.beginPath();for(let i=0;i<102;i++){const w=.75+i*4.25/101;let v;
+if(t.k==="bd")v=Math.exp(-((w-1.3)/.5)**2)*.5+.15+.6*Math.exp(-((w-4.1)/.5)**2)-.2*Math.exp(-((w-3.3)/.15)**2)-.1*Math.exp(-((w-2.3)/.1)**2);
+else v=.9/(w**1.4)+(t.k==="var"?.15*Math.sin(w*4):0);
+v=Math.max(.02,Math.min(1,v));const x=36+i/101*(W-46),y=8+(1-v)*(H-34);i?c.lineTo(x,y):c.moveTo(x,y)}c.stroke()}
+function showView(v){S.view=v;$("#detail").classList.toggle("hide",v!=="home");$("#settings").classList.toggle("hide",v!=="settings");
+$("#left").classList.toggle("hide",v==="settings"&&false);document.querySelectorAll(".rb[data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===v))}
+document.querySelectorAll(".rb[data-v]").forEach(b=>b.onclick=()=>showView(b.dataset.v));
+$("#colBtn").onclick=()=>{$("#app").classList.toggle("col");const c=$("#app").classList.contains("col");$("#colBtn").querySelector("svg").style.transform=c?"rotate(180deg)":""};
+function applyTheme(){if(S.theme==="system")document.documentElement.removeAttribute("data-theme");else document.documentElement.dataset.theme=S.theme;seg();if(S.tgt)setTimeout(()=>{draw();spec()},0)}
+function seg(){$("#themeSeg").innerHTML=["light","dark","system"].map(v=>`<button class="btn ${S.theme===v?"on":""}" data-t="${v}">${v[0].toUpperCase()+v.slice(1)}</button>`).join("");
+document.querySelectorAll("#themeSeg .btn").forEach(b=>b.onclick=()=>{S.theme=b.dataset.t;save();applyTheme()})}
+$("#themeBtn").onclick=()=>{const dark=matchMedia("(prefers-color-scheme:dark)").matches;const cur=S.theme==="system"?(dark?"dark":"light"):S.theme;S.theme=cur==="dark"?"light":"dark";save();applyTheme()};
+$("#sFov").innerHTML=[1,2,4,6].map(v=>`<option value="${v}">${v} arcmin</option>`).join("");$("#sFov").value=S.fov;$("#sFov").onchange=e=>{S.fov=+e.target.value;save();detail()};
+$("#sSpd").innerHTML=[1,2,3,5,8].map(v=>`<option value="${v}">${v} fps</option>`).join("");$("#sSpd").value=S.speed;$("#sSpd").onchange=e=>{S.speed=+e.target.value;save();stop()};
+$("#sMap").value=S.map;$("#sMap").onchange=e=>{S.map=e.target.value;save();for(const k in cache);list();draw()};
+const tr=()=>{$("#sTrack").textContent=S.track?"On":"Off";$("#sTrack").classList.toggle("on",S.track)};tr();$("#sTrack").onclick=()=>{S.track=!S.track;save();tr();draw()};
+applyTheme();list();detail();
+</script></body></html>
