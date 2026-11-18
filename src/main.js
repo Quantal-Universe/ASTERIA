@@ -298,6 +298,27 @@ async function fetchURLWithRateLimitRetry(targetUrl, options) {
 }
 
 let irsaTapQueue = Promise.resolve();
+let irsaGatewayCooldownUntil = 0;
+let irsaGatewayCooldownReason = '';
+
+function recordIrsaGatewayFailure(status, route) {
+  if (![502, 503, 504].includes(Number(status))) return;
+  irsaGatewayCooldownUntil = Date.now() + 45000;
+  irsaGatewayCooldownReason = `HTTP ${status} from ${route}`;
+}
+
+function clearIrsaGatewayCooldown() {
+  irsaGatewayCooldownUntil = 0;
+  irsaGatewayCooldownReason = '';
+}
+
+function assertIrsaGatewayAvailable() {
+  if (Date.now() >= irsaGatewayCooldownUntil) return;
+  const seconds = Math.ceil((irsaGatewayCooldownUntil - Date.now()) / 1000);
+  const error = new Error(`IRSA is temporarily returning gateway errors (${irsaGatewayCooldownReason}); paused archive requests for ${seconds}s.`);
+  error.irsaGatewayFailure = true;
+  throw error;
+}
 
 function queueIrsaTap(task) {
   const pending = irsaTapQueue.then(task, task);
@@ -306,6 +327,7 @@ function queueIrsaTap(task) {
 }
 
 async function queryIrsaTapAsync(adqlQuery, { format = 'json', label = 'IRSA TAP' } = {}) {
+  assertIrsaGatewayAvailable();
   const tapBase = 'https://irsa.ipac.caltech.edu/TAP';
   const params = new URLSearchParams({
     REQUEST: 'doQuery', LANG: 'ADQL', FORMAT: format, PHASE: 'RUN', QUERY: adqlQuery
@@ -324,8 +346,11 @@ async function queryIrsaTapAsync(adqlQuery, { format = 'json', label = 'IRSA TAP
   const submission = await axios.post(`${tapBase}/async`, params.toString(), requestOptions);
   const location = submission.headers?.location;
   if (![200, 201, 202, 302, 303].includes(submission.status) || !location) {
+    recordIrsaGatewayFailure(submission.status, 'TAP async submission');
     const detail = String(submission.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
-    throw new Error(`${label} async job submission failed (HTTP ${submission.status})${detail ? `: ${detail}` : ''}`);
+    const error = new Error(`${label} async job submission failed (HTTP ${submission.status})${detail ? `: ${detail}` : ''}`);
+    error.irsaGatewayFailure = [502, 503, 504].includes(submission.status);
+    throw error;
   }
   const jobUrl = new URL(location, `${tapBase}/`).toString();
   const parsedJobUrl = new URL(jobUrl);
@@ -342,9 +367,12 @@ async function queryIrsaTapAsync(adqlQuery, { format = 'json', label = 'IRSA TAP
       await new Promise(resolve => setTimeout(resolve, 2000));
       const phaseResponse = await axios.get(`${jobUrl}/phase`, requestOptions);
       if ([502, 503, 504].includes(phaseResponse.status)) {
+        recordIrsaGatewayFailure(phaseResponse.status, 'TAP async status');
         consecutiveGatewayErrors += 1;
         if (consecutiveGatewayErrors >= 6) {
-          throw new Error(`${label} job status endpoint repeatedly returned HTTP ${phaseResponse.status}.`);
+          const error = new Error(`${label} job status endpoint repeatedly returned HTTP ${phaseResponse.status}.`);
+          error.irsaGatewayFailure = true;
+          throw error;
         }
         await new Promise(resolve => setTimeout(resolve, 1000 * consecutiveGatewayErrors));
         continue;
@@ -379,9 +407,13 @@ async function queryIrsaTapAsync(adqlQuery, { format = 'json', label = 'IRSA TAP
       await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
     }
     if (result.status < 200 || result.status >= 300) {
+      recordIrsaGatewayFailure(result.status, 'TAP async result');
       const detail = String(result.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
-      throw new Error(`${label} result download failed (HTTP ${result.status})${detail ? `: ${detail}` : ''}`);
+      const error = new Error(`${label} result download failed (HTTP ${result.status})${detail ? `: ${detail}` : ''}`);
+      error.irsaGatewayFailure = [502, 503, 504].includes(result.status);
+      throw error;
     }
+    clearIrsaGatewayCooldown();
     if (format.toLowerCase() === 'json' && typeof result.data === 'string') {
       try { return JSON.parse(result.data); } catch (error) {
         throw new Error(`${label} result was not valid JSON: ${error.message}`);
@@ -562,6 +594,44 @@ function fitsNumber(header, key) {
 }
 
 async function fetchFitsRange(url, ranges) {
+  const parsedUrl = new URL(url);
+  const isSpherexS3 = parsedUrl.hostname === 'nasa-irsa-spherex.s3.us-east-1.amazonaws.com';
+  const requestRange = async ([start, end]) => axios.get(url, {
+    headers: {
+      Accept: 'application/fits, application/octet-stream',
+      'Accept-Encoding': 'identity',
+      Range: `bytes=${start}-${end}`
+    },
+    responseType: 'arraybuffer',
+    timeout: 45000,
+    maxContentLength: 8 * 1024 * 1024,
+    validateStatus: status => status === 206
+  });
+  if (isSpherexS3 && ranges.length > 1) {
+    // S3 object reads are most portable as one byte range per request. Build a
+    // local multipart response so the existing FITS range parser can consume it.
+    const responses = new Array(ranges.length);
+    let nextRangeIndex = 0;
+    const rangeWorker = async () => {
+      while (nextRangeIndex < ranges.length) {
+        const index = nextRangeIndex;
+        nextRangeIndex += 1;
+        responses[index] = await requestRange(ranges[index]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(8, ranges.length) }, rangeWorker));
+    const boundary = `ASTERIA_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const parts = [];
+    responses.forEach((response, index) => {
+      const [start, end] = ranges[index];
+      const total = response.headers['content-range']?.match(/\/(\d+)$/)?.[1] || '*';
+      parts.push(Buffer.from(`--${boundary}\r\nContent-Type: application/octet-stream\r\nContent-Range: bytes ${start}-${end}/${total}\r\n\r\n`));
+      parts.push(Buffer.from(response.data));
+      parts.push(Buffer.from('\r\n'));
+    });
+    parts.push(Buffer.from(`--${boundary}--\r\n`));
+    return { data: Buffer.concat(parts), contentType: `multipart/byteranges; boundary=${boundary}` };
+  }
   const rangeHeader = ranges.map(([start, end]) => `${start}-${end}`).join(',');
   const response = await axios.get(url, {
     headers: {
@@ -571,7 +641,7 @@ async function fetchFitsRange(url, ranges) {
     },
     responseType: 'arraybuffer',
     timeout: 45000,
-    maxContentLength: 1024 * 1024,
+    maxContentLength: 8 * 1024 * 1024,
     validateStatus: status => status === 206
   });
   return { data: Buffer.from(response.data), contentType: response.headers['content-type'] || '' };
@@ -624,59 +694,73 @@ function parseMultipartRanges(data, contentType, requestedRanges) {
 
 const spherexFitsLayoutCache = new Map();
 
-async function getSpectrumHduLayout(product, url, image) {
-  const release = product.uri.match(/\/(l2b-[^/]+)\/(\d+)\//);
-  const cacheKey = release ? `${release[1]}/${release[2]}/${product.energyBandpass}` : null;
+async function getSpectrumHduLayout(product, url, image, {
+  requireFlags = true, requireVariance = true, requireWave = false
+} = {}) {
+  // Header offsets belong to a specific FITS file; don't reuse one exposure's
+  // layout for another exposure just because the detector/release match.
+  const cacheKey = product.uri ? `${product.uri}|flags:${requireFlags}|variance:${requireVariance}|wave:${requireWave}` : null;
   const loadLayout = async () => {
-    const flagsOffset = image.nextOffset;
-    const flagsRange = await fetchFitsRange(url, [[flagsOffset, flagsOffset + 65535]]);
-    const flagsHdu = parseFitsHeaderAt(flagsRange.data);
-    if (flagsHdu.header.EXTNAME?.trim() !== 'FLAGS' || Number(flagsHdu.header.BITPIX) !== 32
-        || Number(flagsHdu.header.NAXIS1) !== Number(image.header.NAXIS1)
-        || Number(flagsHdu.header.NAXIS2) !== Number(image.header.NAXIS2)) {
-      throw new Error('SPHEREx product does not contain a compatible FLAGS image.');
+    const targetWidth = Number(image.header.NAXIS1);
+    const targetHeight = Number(image.header.NAXIS2);
+    const found = {};
+    const extensions = [];
+    let offset = image.nextOffset;
+    // Locate named HDUs instead of assuming FLAGS is immediately after IMAGE;
+    // DR1/QR releases can place other image/table extensions in between.
+    for (let count = 0; count < 12 && offset < Number(product.contentlength); count += 1) {
+      const range = await fetchFitsRange(url, [[offset, Math.min(offset + 65535, Number(product.contentlength) - 1)]]);
+      const hdu = parseFitsHeaderAt(range.data);
+      const name = String(hdu.header.EXTNAME || '').trim().toUpperCase();
+      if (name) extensions.push(name);
+      const sameShape = Number(hdu.header.NAXIS) === 2
+        && Number(hdu.header.NAXIS1) === targetWidth
+        && Number(hdu.header.NAXIS2) === targetHeight;
+      if (name === 'FLAGS' && sameShape && Number(hdu.header.BITPIX) > 0
+          && [8, 16, 32, 64].includes(Number(hdu.header.BITPIX))) {
+        found.flags = { header: hdu.header, dataOffset: offset + hdu.dataOffset };
+      }
+      if (name === 'VARIANCE' && sameShape && Math.abs(Number(hdu.header.BITPIX)) === 32) {
+        found.variance = { header: hdu.header, dataOffset: offset + hdu.dataOffset };
+      }
+      if (name === 'WCS-WAVE') {
+        found.wavelength = {
+          header: hdu.header,
+          fileOffset: offset,
+          byteLength: hdu.dataOffset + hdu.dataBytes
+        };
+      }
+      if ((found.flags || !requireFlags)
+          && (found.variance || !requireVariance)
+          && (found.wavelength || !requireWave)) break;
+      if (!Number.isSafeInteger(hdu.nextOffset) || hdu.nextOffset <= 0) break;
+      offset += hdu.nextOffset;
     }
-
-    const varianceOffset = flagsOffset + flagsHdu.nextOffset;
-    const varianceRange = await fetchFitsRange(url, [[varianceOffset, varianceOffset + 65535]]);
-    const varianceHdu = parseFitsHeaderAt(varianceRange.data);
-    if (varianceHdu.header.EXTNAME?.trim() !== 'VARIANCE' || Math.abs(Number(varianceHdu.header.BITPIX)) !== 32
-        || Number(varianceHdu.header.NAXIS1) !== Number(image.header.NAXIS1)
-        || Number(varianceHdu.header.NAXIS2) !== Number(image.header.NAXIS2)) {
-      throw new Error('SPHEREx product does not contain a compatible VARIANCE image.');
+    if (!found.flags && requireFlags) {
+      throw new Error(`SPHEREx FITS has no compatible FLAGS image (extensions found: ${extensions.join(', ') || 'none'}).`);
     }
-
-    return {
-      flagsHeader: flagsHdu.header,
-      flagsHeaderBytes: flagsHdu.dataOffset,
-      flagsDataBytes: flagsHdu.dataBytes,
-      varianceHeader: varianceHdu.header,
-      varianceHeaderBytes: varianceHdu.dataOffset,
-      varianceDataBytes: varianceHdu.dataBytes
-    };
+    if (!found.variance && requireVariance) {
+      throw new Error(`SPHEREx FITS has no compatible VARIANCE image (extensions found: ${extensions.join(', ') || 'none'}).`);
+    }
+    if (!found.wavelength && requireWave) {
+      throw new Error(`SPHEREx FITS has no WCS-WAVE table (extensions found: ${extensions.join(', ') || 'none'}).`);
+    }
+    return { flagsHdu: found.flags, varianceHdu: found.variance, wavelengthHdu: found.wavelength };
   };
 
   let layoutPromise = cacheKey ? spherexFitsLayoutCache.get(cacheKey) : null;
   if (!layoutPromise) {
     layoutPromise = loadLayout();
-    if (cacheKey) spherexFitsLayoutCache.set(cacheKey, layoutPromise);
+    if (cacheKey) {
+      spherexFitsLayoutCache.set(cacheKey, layoutPromise);
+      while (spherexFitsLayoutCache.size > 64) {
+        spherexFitsLayoutCache.delete(spherexFitsLayoutCache.keys().next().value);
+      }
+    }
   }
   try {
     const layout = await layoutPromise;
-    const flagsOffset = image.nextOffset;
-    const flagsDataOffset = flagsOffset + layout.flagsHeaderBytes;
-    const varianceOffset = flagsDataOffset + Math.ceil(layout.flagsDataBytes / 2880) * 2880;
-    const varianceDataOffset = varianceOffset + layout.varianceHeaderBytes;
-    if (cacheKey) {
-      return {
-        flagsHdu: { header: layout.flagsHeader, dataOffset: flagsDataOffset },
-        varianceHdu: { header: layout.varianceHeader, dataOffset: varianceDataOffset }
-      };
-    }
-    return {
-      flagsHdu: { header: layout.flagsHeader, dataOffset: flagsDataOffset },
-      varianceHdu: { header: layout.varianceHeader, dataOffset: varianceDataOffset }
-    };
+    return layout;
   } catch (error) {
     if (cacheKey && spherexFitsLayoutCache.get(cacheKey) === layoutPromise) {
       spherexFitsLayoutCache.delete(cacheKey);
@@ -864,7 +948,11 @@ async function extractSpherexPixelSpectrum(product, ra, dec, motion) {
       || image.header.CUNIT1W !== 'um') {
     throw new Error('SPHEREx product does not contain a supported 2-D science image.');
   }
-  const { flagsHdu, varianceHdu } = await getSpectrumHduLayout(product, url.toString(), image);
+  const { flagsHdu, varianceHdu, wavelengthHdu } = await getSpectrumHduLayout(product, url.toString(), image, {
+    requireFlags: false,
+    requireVariance: true,
+    requireWave: true
+  });
 
   const midpointMjd = (Number(product.mjdStart) + Number(product.mjdEnd)) / 2;
   if (!Number.isFinite(midpointMjd)) throw new Error('SPHEREx product is missing a valid observation date.');
@@ -875,32 +963,32 @@ async function extractSpherexPixelSpectrum(product, ra, dec, motion) {
   const pixelX = Math.round(pixel.x);
   const pixelY = Math.round(pixel.y);
   if (pixelX < 1 || pixelX > width || pixelY < 1 || pixelY > height
-      || Number(flagsHdu.header.NAXIS1) !== width || Number(flagsHdu.header.NAXIS2) !== height
-      || Number(varianceHdu.header.NAXIS1) !== width || Number(varianceHdu.header.NAXIS2) !== height) {
+      || !varianceHdu || Number(varianceHdu.header.NAXIS1) !== width || Number(varianceHdu.header.NAXIS2) !== height) {
     throw new Error('Selected coordinate is outside the SPHEREx detector image.');
   }
 
   const pixelIndex = (pixelY - 1) * width + (pixelX - 1);
   const imageValueOffset = image.dataOffset + pixelIndex * 4;
-  const flagsValueOffset = flagsHdu.dataOffset + pixelIndex * 4;
   const varianceValueOffset = varianceHdu.dataOffset + pixelIndex * 4;
-  const waveTailStart = fileSize - 5760;
+  const flagsValueOffset = flagsHdu ? flagsHdu.dataOffset + pixelIndex * 4 : null;
+  const waveStart = wavelengthHdu.fileOffset;
+  const waveEnd = waveStart + wavelengthHdu.byteLength - 1;
   const ranges = [
     [imageValueOffset, imageValueOffset + 3],
-    [flagsValueOffset, flagsValueOffset + 3],
+    ...(flagsHdu ? [[flagsValueOffset, flagsValueOffset + 3]] : []),
     [varianceValueOffset, varianceValueOffset + 3],
-    [waveTailStart, fileSize - 1]
+    [waveStart, waveEnd]
   ];
   const sampled = await fetchFitsRange(url.toString(), ranges);
   const parts = parseMultipartRanges(sampled.data, sampled.contentType, ranges);
   const imageBytes = parts.get(imageValueOffset);
-  const flagsBytes = parts.get(flagsValueOffset);
+  const flagsBytes = flagsHdu ? parts.get(flagsValueOffset) : null;
   const varianceBytes = parts.get(varianceValueOffset);
-  const waveTail = parts.get(waveTailStart);
-  const lookup = readWavelengthLookup(waveTail);
+  const waveTable = parts.get(waveStart);
+  const lookup = readWavelengthLookup(waveTable);
   const wavelength = interpolateWavelength(lookup, pixelX, pixelY);
   const flux = imageBytes.readFloatBE(0) * Number(image.header.BSCALE ?? 1) + Number(image.header.BZERO ?? 0);
-  const flags = flagsBytes.readInt32BE(0);
+  const flags = flagsBytes ? flagsBytes.readInt32BE(0) : 0;
   const variance = varianceBytes.readFloatBE(0) * Number(varianceHdu.header.BSCALE ?? 1)
     + Number(varianceHdu.header.BZERO ?? 0);
   if (!Number.isFinite(flux) || !Number.isFinite(variance) || variance < 0
@@ -1088,7 +1176,73 @@ function parseCsvRows(csvText) {
   if (field || row.length) { row.push(field); rows.push(row); }
   if (!rows.length) return [];
   const headers = rows.shift().map(value => value.trim().toLowerCase());
-  return rows.map(values => Object.fromEntries(headers.map((key, index) => [key, values[index] ?? ''])));
+  const cloudAccessIndex = headers.indexOf('cloud_access');
+  return rows.map(values => {
+    // IRSA's CSV currently emits cloud_access JSON containing commas without
+    // CSV quotes. Rejoin just that trailing JSON cell so later columns remain
+    // aligned and the documented S3 mirror can be used.
+    if (cloudAccessIndex >= 0 && values.length > headers.length) {
+      const trailingColumns = headers.length - cloudAccessIndex - 1;
+      const cloudAccessEnd = values.length - trailingColumns;
+      values = [
+        ...values.slice(0, cloudAccessIndex),
+        values.slice(cloudAccessIndex, cloudAccessEnd).join(','),
+        ...values.slice(cloudAccessEnd)
+      ];
+    }
+    return Object.fromEntries(headers.map((key, index) => [key, values[index] ?? '']));
+  });
+}
+
+function sampleSpherexEpochRows(rows, limit) {
+  const chronological = rows.slice().sort((left, right) => Number(left.t_min) - Number(right.t_min));
+  const timed = chronological.filter(row => Number.isFinite(Number(row.t_min)));
+  if (timed.length < 2) return chronological.slice(0, limit);
+  // SIA may return several same-time spectral products for one sky pass. Keep
+  // one representative per 20-minute epoch, then spread the selected frames
+  // across the available dates rather than taking the first channels returned.
+  const epochs = [];
+  for (const row of timed) {
+    const mjd = Number(row.t_min);
+    const lastEpoch = epochs[epochs.length - 1];
+    if (!lastEpoch || mjd - lastEpoch.mjd > 20 / 1440) epochs.push({ mjd, row });
+  }
+  if (epochs.length <= limit) return epochs.map(epoch => epoch.row);
+  if (limit === 1) return [epochs[Math.floor(epochs.length / 2)].row];
+  return Array.from({ length: limit }, (_, index) => {
+    const selectedIndex = Math.round(index * (epochs.length - 1) / (limit - 1));
+    return epochs[selectedIndex].row;
+  });
+}
+
+function detectorInSpherexProductUrl(uri) {
+  let path = String(uri || '');
+  try { path = decodeURIComponent(new URL(path).pathname); } catch (error) { /* keep raw URL text */ }
+  return path.match(/_2D([1-6])(?:_|\.)/i)?.[1] || null;
+}
+
+function spherexCloudAccessUrl(cloudAccess, release) {
+  try {
+    let cloud = cloudAccess;
+    if (typeof cloud === 'string') {
+      try { cloud = JSON.parse(cloud); }
+      catch (error) {
+        // The current IRSA CSV response strips JSON string quotes and does not
+        // escape the commas in cloud_access. Restore this simple metadata form.
+        const normalized = cloud
+          .replace(/([{,]\s*)([A-Za-z_][\w-]*)(\s*:)/g, '$1"$2"$3')
+          .replace(/:\s*([A-Za-z0-9_./-]+)(\s*[,}])/g, ':"$1"$2');
+        cloud = JSON.parse(normalized);
+      }
+    }
+    const bucket = cloud?.aws?.bucket_name;
+    const key = String(cloud?.aws?.key || '').replace(/^\/+/, '');
+    const prefix = release === 'spherex_dr1' ? 'dr1/' : release === 'spherex_qr3' ? 'qr3/' : '';
+    if (bucket !== 'nasa-irsa-spherex' || !prefix || !key.startsWith(prefix)) return null;
+    return `https://${bucket}.s3.us-east-1.amazonaws.com/${key.split('/').map(encodeURIComponent).join('/')}`;
+  } catch (error) {
+    return null;
+  }
 }
 
 async function querySpherexCutoutProductsViaSia(ra, dec, detector, release, limit, motion = null) {
@@ -1100,14 +1254,17 @@ async function querySpherexCutoutProductsViaSia(ra, dec, detector, release, limi
   const properMotionArcsecPerYear = motion ? Math.hypot(motion.pmra, motion.pmdec) : 0;
   const searchRadiusDegrees = 0.01 + properMotionArcsecPerYear * 1.5 / 3600;
   const params = new URLSearchParams({
-    COLLECTION: release,
     POS: `CIRCLE ${searchCenter.ra} ${searchCenter.dec} ${searchRadiusDegrees}`,
     CALIB: '2',
     DPTYPE: 'image',
     FORMAT: 'image/fits',
-    MAXREC: String(Math.max(24, limit * 8)),
+    // Ask SIA for enough of the target's real image products to select epochs
+    // across the release baseline, rather than sampling only its first rows.
+    MAXREC: String(Math.max(120, limit * 20)),
     RESPONSEFORMAT: 'CSV'
   });
+  params.append('COLLECTION', release);
+  params.append('COLLECTION', `${release}_deep`);
   const response = await axios.get(`https://irsa.ipac.caltech.edu/SIA?${params}`, {
     timeout: 25000,
     responseType: 'text',
@@ -1116,7 +1273,10 @@ async function querySpherexCutoutProductsViaSia(ra, dec, detector, release, limi
     headers: { 'User-Agent': 'SPHEREx-Electron-Tool/1.0' }
   });
   if (response.status < 200 || response.status >= 300) {
-    throw new Error(`IRSA SIA2 image search failed (HTTP ${response.status}).`);
+    const error = new Error(`IRSA SIA2 image search failed (HTTP ${response.status}).`);
+    error.status = response.status;
+    error.irsaGatewayFailure = [502, 503, 504].includes(response.status);
+    throw error;
   }
   const rows = parseCsvRows(response.data);
   if (!rows.length) throw new Error('IRSA SIA2 returned no image rows.');
@@ -1124,40 +1284,50 @@ async function querySpherexCutoutProductsViaSia(ra, dec, detector, release, limi
     const band = String(row.energy_bandpassname || row.energy_band || row.bandpass || '').toUpperCase();
     const format = String(row.access_format || '').toLowerCase();
     const uri = row.access_url;
-    const matchesDetector = band
-      ? band.includes(`SPHEREX-${detector}`) || band.endsWith(detector)
-      : /_2D[1-6]_/.test(String(uri || '')) && String(uri).includes(`_2${detector}_`);
+    const uriDetector = detectorInSpherexProductUrl(uri);
+    // SIA's bandpass label is not guaranteed to encode the detector. The
+    // published SPHEREx filename does, so trust it when present.
+    const matchesDetector = uriDetector
+      ? uriDetector === detector.slice(1)
+      : band.includes(`SPHEREX-${detector}`) || band.endsWith(detector);
     return uri && matchesDetector
       && (!format || format.includes('fits'));
-  }).slice(0, limit);
-  const mapped = await Promise.all(products.map(async row => {
-    const uri = row.access_url;
+  });
+  const selectedProducts = sampleSpherexEpochRows(products, limit);
+  const mapped = await Promise.all(selectedProducts.map(async row => {
+    const cloudUri = spherexCloudAccessUrl(row.cloud_access, release);
+    const candidateUris = [...new Set([cloudUri, row.access_url].filter(Boolean))];
     const start = Number(row.t_min || row.time_bounds_lower);
     const end = Number(row.t_max || row.time_bounds_upper || row.t_min || row.time_bounds_lower);
-    const band = row.energy_bandpassname || row.energy_band || row.bandpass || `SPHEREx-${detector}`;
-    try {
-      const head = await axios.head(uri, { timeout: 10000, maxRedirects: 5, validateStatus: () => true });
-      const contentlength = Number(head.headers?.['content-length'] || row.contentlength);
-      if (head.status < 200 || head.status >= 400 || !Number.isSafeInteger(contentlength)) return null;
-      return {
-        uri,
-        contentlength,
-        energyBandpass: band,
-        observationId: row.obs_id || row.observationid || row.obs_publisher_did || uri.split('/').pop().split('?')[0],
-        mjdStart: start,
-        mjdEnd: end,
-        collection: row.obs_collection || release
-      };
-    } catch (error) {
-      return null;
+    const reportedBand = String(row.energy_bandpassname || row.energy_band || row.bandpass || '');
+    const uriDetector = detectorInSpherexProductUrl(row.access_url || cloudUri);
+    const band = /SPHEREX-D[1-6]/i.test(reportedBand) ? reportedBand : `SPHEREx-${uriDetector || detector}`;
+    for (const uri of candidateUris) {
+      try {
+        const head = await axios.head(uri, { timeout: 10000, maxRedirects: 5, validateStatus: () => true });
+        const contentlength = Number(head.headers?.['content-length'] || row.contentlength);
+        if (head.status < 200 || head.status >= 400 || !Number.isSafeInteger(contentlength)) continue;
+        return {
+          uri,
+          contentlength,
+          energyBandpass: band,
+          observationId: row.obs_id || row.observationid || row.obs_publisher_did || uri.split('/').pop().split('?')[0],
+          mjdStart: start,
+          mjdEnd: end,
+          collection: row.obs_collection || release
+        };
+      } catch (error) {
+        // Try the same public product through IRSA's documented S3 mirror.
+      }
     }
+    return null;
   }));
   return mapped.filter(product => product && Number.isFinite(product.mjdStart) && Number.isFinite(product.mjdEnd));
 }
 
 async function querySpherexCutoutProducts(ra, dec, detector, release, limit, motion = null) {
   const searchCenter = positionAtMjd(ra, dec, motion, 61041);
-  const adqlQuery = `SELECT TOP ${limit} o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection = '${release}' AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${searchCenter.ra}, ${searchCenter.dec}), p.poly) ORDER BY p.time_bounds_lower`;
+  const adqlQuery = `SELECT TOP ${limit} o.observationid, p.energy_bandpassname, p.time_bounds_lower, p.time_bounds_upper, a.uri, a.contentlength, o.collection FROM spherex.plane AS p JOIN spherex.artifact AS a ON p.planeid = a.planeid JOIN spherex.observation AS o ON p.obsid = o.obsid WHERE o.collection IN ('${release}', '${release}_deep') AND p.calibrationlevel = 2 AND p.dataproducttype = 'image' AND a.producttype = 'science' AND p.time_bounds_lower IS NOT NULL AND p.time_bounds_upper IS NOT NULL AND p.energy_bandpassname = 'SPHEREx-${detector}' AND 1 = CONTAINS(POINT('ICRS', ${searchCenter.ra}, ${searchCenter.dec}), p.poly) ORDER BY p.time_bounds_lower`;
   // SIA2 is IRSA's current image-search interface and is independent of TAP's
   // async job queue, which can return gateway errors while the archive is busy.
   try {
@@ -1171,6 +1341,7 @@ async function querySpherexCutoutProducts(ra, dec, detector, release, limit, mot
   try {
     payload = await queueIrsaTap(() => queryIrsaTapAsync(adqlQuery, { label: `SPHEREx ${detector} ${release} cutout search` }));
   } catch (tapError) {
+    if (tapError.irsaGatewayFailure) throw tapError;
     throw new Error(`IRSA image discovery failed via SIA2 and TAP (${tapError.message}).`);
   }
   const table = payload?.VOTABLE?.RESOURCE_ARRAY?.[0]?.TABLE;
@@ -1193,12 +1364,15 @@ async function querySpherexCutoutProducts(ra, dec, detector, release, limit, mot
 
 async function extractSpherexImageCutout(product, ra, dec, motion, size = 64) {
   const fileSize = Number(product.contentlength);
-  if (!Number.isSafeInteger(fileSize) || fileSize < 10000 || fileSize > 100 * 1024 * 1024) {
+  if (!Number.isSafeInteger(fileSize) || fileSize < 10000 || fileSize > 2 * 1024 * 1024 * 1024) {
     throw new Error('SPHEREx archive product has an invalid or unsupported file size.');
   }
   const url = new URL(product.uri, 'https://irsa.ipac.caltech.edu/');
-  if (url.hostname !== 'irsa.ipac.caltech.edu'
-      || !/^\/(?:ibe\/)?data\/(?:spherex|SPHEREx)\//i.test(url.pathname)) {
+  const validIpacProduct = url.hostname === 'irsa.ipac.caltech.edu'
+    && /^\/(?:ibe\/)?data\/(?:spherex|SPHEREx)\//i.test(url.pathname);
+  const validCloudProduct = url.hostname === 'nasa-irsa-spherex.s3.us-east-1.amazonaws.com'
+    && /^\/(?:dr1|qr3)\//.test(url.pathname);
+  if (!validIpacProduct && !validCloudProduct) {
     throw new Error('SPHEREx archive returned an unexpected product URL.');
   }
   const headerResponse = await fetchFitsRange(url.toString(), [[0, 65535]]);
@@ -1208,7 +1382,11 @@ async function extractSpherexImageCutout(product, ra, dec, motion, size = 64) {
       || Math.abs(Number(image.header.BITPIX)) !== 32 || image.header.BUNIT !== 'MJy / sr') {
     throw new Error('SPHEREx product does not contain a supported 2-D science image.');
   }
-  const { flagsHdu, varianceHdu } = await getSpectrumHduLayout(product, url.toString(), image);
+  const { flagsHdu, wavelengthHdu } = await getSpectrumHduLayout(product, url.toString(), image, {
+    requireFlags: false,
+    requireVariance: false,
+    requireWave: true
+  });
   const midpointMjd = (product.mjdStart + product.mjdEnd) / 2;
   const trackedPosition = positionAtMjd(ra, dec, motion, midpointMjd);
   const pixel = skyToFitsPixel(image.header, trackedPosition.ra, trackedPosition.dec);
@@ -1219,38 +1397,53 @@ async function extractSpherexImageCutout(product, ra, dec, motion, size = 64) {
   const startX = Math.max(1, Math.min(imageWidth - width + 1, Math.round(pixel.x) - Math.floor(width / 2)));
   const startY = Math.max(1, Math.min(imageHeight - height + 1, Math.round(pixel.y) - Math.floor(height / 2)));
   if (pixel.x < 1 || pixel.x > imageWidth || pixel.y < 1 || pixel.y > imageHeight
-      || Number(flagsHdu.header.NAXIS1) !== imageWidth || Number(flagsHdu.header.NAXIS2) !== imageHeight
-      || Number(varianceHdu.header.NAXIS1) !== imageWidth || Number(varianceHdu.header.NAXIS2) !== imageHeight) {
+      || (flagsHdu && (Number(flagsHdu.header.NAXIS1) !== imageWidth || Number(flagsHdu.header.NAXIS2) !== imageHeight))) {
     throw new Error('Selected coordinate is outside the SPHEREx detector image.');
   }
 
-  const imageRanges = [];
-  const flagsRanges = [];
-  for (let row = 0; row < height; row += 1) {
-    const firstPixel = (startY + row - 1) * imageWidth + startX - 1;
-    const imageStart = image.dataOffset + firstPixel * 4;
-    const flagsStart = flagsHdu.dataOffset + firstPixel * 4;
-    imageRanges.push([imageStart, imageStart + width * 4 - 1]);
-    flagsRanges.push([flagsStart, flagsStart + width * 4 - 1]);
+  const flagBytesPerPixel = flagsHdu ? Math.abs(Number(flagsHdu.header.BITPIX)) / 8 : 0;
+  if (flagsHdu && ![1, 2, 4, 8].includes(flagBytesPerPixel)) {
+    throw new Error(`Unsupported SPHEREx FLAGS pixel width (${flagsHdu.header.BITPIX} bits).`);
   }
-  const waveTailStart = fileSize - 5760;
-  const waveTailRange = [waveTailStart, fileSize - 1];
-  const ranges = [...imageRanges.flatMap((range, index) => [range, flagsRanges[index]]), waveTailRange];
+  // Fetch row strips rather than one tiny range per row. This reduces a
+  // 64x64 image from 129 separate S3 requests to at most three ranges while
+  // keeping transferred data below roughly 1.1 MB for a 2040-pixel detector.
+  const firstRowPixel = (startY - 1) * imageWidth;
+  const lastRowPixelExclusive = (startY - 1 + height) * imageWidth;
+  const imageBlockStart = image.dataOffset + firstRowPixel * 4;
+  const imageBlockEnd = image.dataOffset + lastRowPixelExclusive * 4 - 1;
+  const imageBlockRange = [imageBlockStart, imageBlockEnd];
+  const flagsBlockStart = flagsHdu ? flagsHdu.dataOffset + firstRowPixel * flagBytesPerPixel : null;
+  const flagsBlockEnd = flagsHdu ? flagsHdu.dataOffset + lastRowPixelExclusive * flagBytesPerPixel - 1 : null;
+  const flagsBlockRange = flagsHdu ? [flagsBlockStart, flagsBlockEnd] : null;
+  const waveRange = [wavelengthHdu.fileOffset, wavelengthHdu.fileOffset + wavelengthHdu.byteLength - 1];
+  const ranges = [imageBlockRange, ...(flagsBlockRange ? [flagsBlockRange] : []), waveRange];
   const cutoutResponse = await fetchFitsRange(url.toString(), ranges);
   const rangeData = parseMultipartRanges(cutoutResponse.data, cutoutResponse.contentType, ranges);
+  const imageBlock = rangeData.get(imageBlockStart);
+  const flagsBlock = flagsHdu ? rangeData.get(flagsBlockStart) : null;
+  const wavelengthBlock = rangeData.get(wavelengthHdu.fileOffset);
   const pixels = new Array(width * height);
-  const flags = new Array(width * height);
+  const flags = new Array(width * height).fill(0);
   for (let y = 0; y < height; y += 1) {
-    const imageRow = rangeData.get(imageRanges[y][0]);
-    const flagsRow = rangeData.get(flagsRanges[y][0]);
+    const rowPixelOffset = y * imageWidth + startX - 1;
     for (let x = 0; x < width; x += 1) {
       const index = y * width + x;
-      pixels[index] = imageRow.readFloatBE(x * 4) * Number(image.header.BSCALE ?? 1)
+      const sourcePixel = rowPixelOffset + x;
+      pixels[index] = imageBlock.readFloatBE(sourcePixel * 4) * Number(image.header.BSCALE ?? 1)
         + Number(image.header.BZERO ?? 0);
-      flags[index] = flagsRow.readInt32BE(x * 4);
+      if (!flagsHdu) continue;
+      const flagValue = flagBytesPerPixel === 8
+        ? flagsBlock.readBigInt64BE(sourcePixel * 8)
+        : flagBytesPerPixel === 4
+          ? flagsBlock.readInt32BE(sourcePixel * 4)
+          : flagBytesPerPixel === 2
+            ? flagsBlock.readInt16BE(sourcePixel * 2)
+            : flagsBlock.readInt8(sourcePixel);
+      flags[index] = flagValue === 0 || flagValue === 0n ? 0 : 1;
     }
   }
-  const lookup = readWavelengthLookup(rangeData.get(waveTailStart));
+  const lookup = readWavelengthLookup(wavelengthBlock);
   const wavelength = interpolateWavelength(lookup, Math.round(pixel.x), Math.round(pixel.y));
   const cdelt1 = Number(image.header.CDELT1 ?? 1);
   const cdelt2 = Number(image.header.CDELT2 ?? 1);
@@ -1281,12 +1474,13 @@ async function extractSpherexImageCutout(product, ra, dec, motion, size = 64) {
     observationId: product.observationId,
     timestamp: ((midpointMjd - 40587) * 86400000),
     exposureSeconds: Math.max(0, (product.mjdEnd - product.mjdStart) * 86400),
-    collection: product.collection
+    collection: product.collection,
+    flagsAvailable: Boolean(flagsHdu)
   };
 }
 
 ipcMain.handle('spherex:load-cutouts', async (event, {
-  ra, dec, motion = null, collection = 'spherex_dr1', detector = 'D1', frameLimit = 8, requestId
+  ra, dec, motion = null, collection = 'spherex_dr1', detector = 'D1', frameLimit = 8, cutoutSize = 64, requestId, allEpochs = false
 }) => {
   try {
     if (!Number.isFinite(ra) || ra < 0 || ra >= 360 || !Number.isFinite(dec) || dec < -90 || dec > 90) {
@@ -1299,11 +1493,14 @@ ipcMain.handle('spherex:load-cutouts', async (event, {
     if (!Number.isInteger(frameLimit) || frameLimit < 2 || frameLimit > 12) {
       throw new Error('The cutout frame limit must be from 2 to 12.');
     }
+    if (!Number.isInteger(cutoutSize) || cutoutSize < 32 || cutoutSize > 256) {
+      throw new Error('The image cutout size must be from 32 to 256 native pixels.');
+    }
     if (motion && ['ra', 'dec', 'pmra', 'pmdec', 'refEpoch'].some(key => !Number.isFinite(motion[key]))) {
       throw new Error('Gaia proper-motion data for the target is incomplete.');
     }
 
-    const cacheKey = [ra.toFixed(7), dec.toFixed(7), detector, collection, frameLimit,
+    const cacheKey = [ra.toFixed(7), dec.toFixed(7), detector, collection, frameLimit, cutoutSize, allEpochs ? 'all-epochs' : 'preferred-release',
       ...(motion ? [motion.ra, motion.dec, motion.pmra, motion.pmdec, motion.refEpoch] : [])].join(':');
     const cached = spherexCutoutCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return { success: true, ...cached.result, cached: true };
@@ -1321,13 +1518,24 @@ ipcMain.handle('spherex:load-cutouts', async (event, {
             productsByDetector.push(...await querySpherexCutoutProducts(ra, dec, detectorName, release, detectorLimit, motion));
           } catch (error) {
             failures.push(`${detectorName} ${release}: ${error.message}`);
+            if (error.irsaGatewayFailure) break;
           }
         }
-        products = productsByDetector;
-        if (products.length) break;
+        products.push(...productsByDetector);
+        if (products.length && !allEpochs) break;
+        if (failures.some(message => /temporarily returning gateway errors|HTTP 50[234]|repeatedly returned HTTP 50[234]/.test(message))) break;
       } catch (error) {
         failures.push(`${release}: ${error.message}`);
       }
+    }
+    const uniqueProducts = new Map();
+    for (const product of products) {
+      const key = `${product.observationId}|${product.energyBandpass}|${product.mjdStart}`;
+      if (!uniqueProducts.has(key)) uniqueProducts.set(key, product);
+    }
+    products = [...uniqueProducts.values()].sort((a, b) => a.mjdStart - b.mjdStart);
+        if (allEpochs && detector !== 'all' && products.length > frameLimit) {
+      products = sampleSpherexEpochRows(products.map(product => ({ ...product, t_min: product.mjdStart })), frameLimit);
     }
     if (!products.length) {
       return {
@@ -1339,21 +1547,37 @@ ipcMain.handle('spherex:load-cutouts', async (event, {
     }
 
     const frames = [];
-    for (const product of products) {
-      try {
-        frames.push(await extractSpherexImageCutout(product, ra, dec, motion));
-        if (typeof event.sender?.send === 'function' && !event.sender.isDestroyed?.()) {
-          event.sender.send('spherex:cutout-progress', {
-            requestId,
-            completed: frames.length,
-            total: products.length,
-            observationId: product.observationId
-          });
-        }
-      } catch (error) {
-        failures.push(`${product.observationId}: ${error.message}`);
+    let completedProducts = 0;
+    let nextProductIndex = 0;
+    const reportCutoutProgress = progress => {
+      if (typeof event.sender?.send === 'function' && !event.sender.isDestroyed?.()) {
+        event.sender.send('spherex:cutout-progress', { requestId, ...progress });
       }
-    }
+    };
+    const readProduct = async product => {
+      reportCutoutProgress({ phase: 'reading', completed: completedProducts, total: products.length, observationId: product.observationId });
+      let errorMessage;
+      try {
+        // Time comparison needs a fixed sky frame so moving objects shift
+        // against background stars. Keep proper motion for archive discovery,
+        // but do not recenter each downloaded image on the moving target.
+        const cutoutMotion = allEpochs ? null : motion;
+        frames.push(await extractSpherexImageCutout(product, ra, dec, cutoutMotion, cutoutSize));
+      } catch (error) {
+        errorMessage = error.message;
+        failures.push(`${product.observationId}: ${errorMessage}`);
+      }
+      completedProducts += 1;
+      reportCutoutProgress({ phase: 'complete', completed: completedProducts, total: products.length, observationId: product.observationId, error: errorMessage });
+    };
+    const worker = async () => {
+      while (nextProductIndex < products.length) {
+        const index = nextProductIndex;
+        nextProductIndex += 1;
+        await readProduct(products[index]);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, products.length) }, worker));
     frames.sort((a, b) => a.timestamp - b.timestamp);
     if (!frames.length) {
       throw new Error(`No SPHEREx image cutouts could be read. ${failures.slice(0, 3).join('; ')}`);
@@ -1441,9 +1665,10 @@ ipcMain.handle('spherex:query-gaia', async (event, { adqlQuery, requestId }) => 
         }
         const mirrorDetail = String(mirrorResponse.data || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300);
         if (mirrorResponse.status === 429) {
-          return { success: false, error: `Gaia@AIP is at its concurrent-job limit. ASTERIA stopped this query instead of launching more jobs.${mirrorDetail ? ` ${mirrorDetail}` : ''}` };
+          console.warn(`[Gaia TAP] Gaia@AIP is at its concurrent-job limit; not retrying that mirror. Trying one ESA async request instead.${mirrorDetail ? ` ${mirrorDetail}` : ''}`);
+        } else {
+          console.warn(`[Gaia TAP] Gaia@AIP returned HTTP ${mirrorResponse.status}${mirrorDetail ? `: ${mirrorDetail}` : ''}; trying ESA async TAP.`);
         }
-        console.warn(`[Gaia TAP] Gaia@AIP returned HTTP ${mirrorResponse.status}${mirrorDetail ? `: ${mirrorDetail}` : ''}; trying ESA async TAP.`);
       } catch (mirrorError) {
         console.warn(`[Gaia TAP] Gaia@AIP mirror failed (${mirrorError.message}); stopping to avoid queuing duplicate Gaia jobs.`);
         return { success: false, error: `Gaia ESA sync and Gaia@AIP fallback both failed: ${mirrorError.message}` };
