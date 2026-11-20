@@ -225,6 +225,7 @@
                     <button id="timeComparisonPrevBtn" type="button" class="rounded border border-slate-700 px-3 py-2 text-slate-200 disabled:opacity-40" aria-label="Previous observation" disabled>◀</button>
                     <button id="timeComparisonPlayBtn" type="button" class="rounded bg-cyan-900 px-3 py-2 text-slate-100 disabled:opacity-40" aria-label="Play observations" disabled>▶ Play</button>
                     <button id="timeComparisonNextBtn" type="button" class="rounded border border-slate-700 px-3 py-2 text-slate-200 disabled:opacity-40" aria-label="Next observation" disabled>▶|</button>
+                    <button id="timeComparisonAnalyzeBtn" type="button" class="rounded border border-cyan-800 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-950 disabled:opacity-40" disabled>Image analysis</button>
                     <label class="flex items-center gap-2 text-xs text-slate-400">Playback speed <input id="timeComparisonSpeed" type="range" min="250" max="2000" step="250" value="1000" class="w-28 accent-cyan-400"></label>
                     <span id="timeComparisonEpochLabel" class="min-w-24 font-mono text-xs text-cyan-300">No epochs</span>
                     <input id="timeComparisonScrubber" type="range" min="0" max="0" value="0" class="min-w-32 flex-1 accent-cyan-400" aria-label="Select observation epoch" disabled>
@@ -251,6 +252,44 @@
                     </label>
                 </div>
                 <p class="px-3 pb-2 text-[10px] text-slate-500">False color and stretch affect display only. Each frame remains one real SPHEREx infrared band; the cutout shows up to 256 × 256 native detector pixels.</p>
+                <section id="timeComparisonAnalysisPanel" class="hidden max-h-[44vh] shrink-0 overflow-auto border-t border-slate-800 bg-slate-950 p-3" aria-labelledby="timeComparisonAnalysisTitle">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 id="timeComparisonAnalysisTitle" class="text-sm font-semibold text-white">Image and epoch analysis</h3>
+                            <p class="text-[10px] text-slate-400">Starts on the tracked target. Click any image position to compare that point across compatible epochs.</p>
+                        </div>
+                        <button id="timeComparisonClearProbeBtn" type="button" class="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-300">Clear image point</button>
+                    </div>
+                    <label class="mt-2 inline-flex items-center gap-1.5 text-[10px] text-slate-300"><input id="timeComparisonFollowMotion" type="checkbox" checked disabled class="accent-cyan-400"> Follow Gaia-predicted position when measuring the target</label>
+                    <p id="timeComparisonAnalysisStatus" class="mt-2 text-[10px] text-slate-400" role="status" aria-live="polite">Select an image to inspect calibrated pixel values and compare nearby brightness across dates.</p>
+                    <div id="timeComparisonFrameDetails" class="mt-2 grid grid-cols-2 gap-1.5 text-[10px] text-slate-300 sm:grid-cols-4"></div>
+                    <div class="mt-2 grid min-w-0 grid-cols-1 gap-2 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
+                        <div class="min-w-0 rounded border border-slate-800 p-1.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+                                <label for="timeComparisonAnalysisMetric" class="text-[9px] text-slate-400">Plot</label>
+                                <select id="timeComparisonAnalysisMetric" class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-[10px] text-slate-200">
+                                    <option value="brightnessExcess">Local brightness (MJy/sr)</option>
+                                    <option value="brightnessDelta">Change from first epoch (MJy/sr)</option>
+                                    <option value="eastOffsetArcsec">Centroid motion east (arcsec)</option>
+                                    <option value="northOffsetArcsec">Centroid motion north (arcsec)</option>
+                                    <option value="snr">Aperture signal / noise</option>
+                                </select>
+                            </div>
+                            <div class="relative mt-1">
+                                <canvas id="timeComparisonAnalysisChart" class="block h-44 w-full cursor-crosshair" role="img" aria-label="Interactive plot of measured SPHEREx signal by observation epoch"></canvas>
+                                <div id="timeComparisonAnalysisTooltip" class="pointer-events-none absolute z-10 hidden rounded border border-slate-600 bg-slate-950/95 px-2 py-1 text-[9px] text-slate-100 shadow-lg"></div>
+                            </div>
+                            <p id="timeComparisonAnalysisPlotNote" class="px-1 text-[9px] text-slate-500">Select a measurement to plot. Click a plotted point to jump to that epoch.</p>
+                        </div>
+                        <div class="min-w-0 overflow-auto rounded border border-slate-800">
+                            <table class="w-full text-left text-[9px] text-slate-300">
+                                <thead class="sticky top-0 bg-slate-900 text-slate-400"><tr><th class="p-1">UTC</th><th class="p-1">λ μm</th><th class="p-1">Pixel</th><th class="p-1">Aperture Δ</th><th class="p-1">± error</th><th class="p-1">S/N</th><th class="p-1">Δ first</th><th class="p-1">Centroid E / N</th><th class="p-1">Masked px</th></tr></thead>
+                                <tbody id="timeComparisonAnalysisRows"><tr><td colspan="9" class="p-2 text-slate-500">Click a point in the image to begin.</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-[9px] text-slate-500">Quick-look measurements use a 3.5-pixel aperture and a 5–9-pixel local annulus, exclude flagged pixels, and report calibrated surface brightness rather than PSF-fitted source flux. Instrumental and wavelength effects can mimic changes.</p>
+                </section>
                 </div>
             </div>
         </section>
@@ -725,7 +764,7 @@
             progressTotal: 0,
             exportingGif: false
         };
-        const timeComparisonState = { frames: [], index: 0, timer: null, requestId: 0, target: null, selectedTarget: null, loading: false, coordinateNote: '', progress: '', brightnessScales: new Map() };
+        const timeComparisonState = { frames: [], index: 0, timer: null, requestId: 0, target: null, selectedTarget: null, loading: false, coordinateNote: '', progress: '', brightnessScales: new Map(), registeredFrames: [], inspection: null, displayRect: null, analysisSamples: [], analysisPlotPoints: [], analysisHoverIndex: null };
         const spectrumGraphFrame = document.getElementById('spectrumGraphFrame');
         let pendingSpectrumGraphMessage = null;
         spectrumGraphFrame.addEventListener('load', () => {
@@ -1632,6 +1671,35 @@
             document.getElementById('timeComparisonStretch').disabled = isDifference;
             drawTimeComparisonFrame();
         });
+        document.getElementById('timeComparisonAnalyzeBtn').addEventListener('click', () => {
+            const panel = document.getElementById('timeComparisonAnalysisPanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) renderTimeComparisonAnalysis();
+            document.getElementById('timeComparisonAnalyzeBtn').textContent = panel.classList.contains('hidden') ? 'Image analysis' : 'Hide analysis';
+        });
+        document.getElementById('timeComparisonClearProbeBtn').addEventListener('click', () => {
+            timeComparisonState.inspection = null;
+            timeComparisonState.analysisHoverIndex = null;
+            renderTimeComparisonAnalysis();
+            drawTimeComparisonFrame();
+        });
+        document.getElementById('timeComparisonFollowMotion').addEventListener('change', renderTimeComparisonAnalysis);
+        document.getElementById('timeComparisonCanvas').addEventListener('click', handleTimeComparisonCanvasClick);
+        document.getElementById('timeComparisonAnalysisMetric').addEventListener('change', () => drawTimeComparisonAnalysisChart(timeComparisonState.analysisSamples));
+        document.getElementById('timeComparisonAnalysisChart').addEventListener('pointermove', handleTimeComparisonAnalysisPointerMove);
+        document.getElementById('timeComparisonAnalysisChart').addEventListener('pointerleave', () => {
+            document.getElementById('timeComparisonAnalysisTooltip').classList.add('hidden');
+        });
+        document.getElementById('timeComparisonAnalysisChart').addEventListener('click', handleTimeComparisonAnalysisChartClick);
+        document.getElementById('timeComparisonAnalysisRows').addEventListener('click', event => {
+            const row = event.target.closest('tr[data-epoch-index]');
+            if (row) setTimeComparisonFrame(Number(row.dataset.epochIndex));
+        });
+        window.addEventListener('resize', () => {
+            if (!document.getElementById('timeComparisonAnalysisPanel').classList.contains('hidden')) {
+                requestAnimationFrame(() => drawTimeComparisonAnalysisChart(timeComparisonState.analysisSamples));
+            }
+        });
         document.getElementById('timeComparisonSpeed').addEventListener('input', () => {
             if (timeComparisonState.timer) {
                 toggleTimeComparisonPlayback();
@@ -2504,12 +2572,22 @@
                 motion
             };
             timeComparisonState.target = target;
+            const followMotion = document.getElementById('timeComparisonFollowMotion');
+            followMotion.disabled = !motion;
+            followMotion.checked = Boolean(motion);
             timeComparisonState.loading = true;
             timeComparisonState.progress = 'Searching the live SPHEREx archive…';
             if (timeComparisonState.timer) clearInterval(timeComparisonState.timer);
             timeComparisonState.timer = null;
             timeComparisonState.frames = [];
             timeComparisonState.index = 0;
+            timeComparisonState.inspection = null;
+            timeComparisonState.analysisSamples = [];
+            timeComparisonState.analysisPlotPoints = [];
+            timeComparisonState.analysisHoverIndex = null;
+            timeComparisonState.registeredFrames = [];
+            timeComparisonState.displayRect = null;
+            renderTimeComparisonAnalysis();
             loadButton.disabled = true;
             const trackingNote = motion
                 ? ' The Gaia DR3 predicted position will be marked while the sky stays fixed.'
@@ -2562,6 +2640,14 @@
                     timeComparisonState.loading = false;
                     loadButton.disabled = false;
                     drawTimeComparisonFrame();
+                    if (timeComparisonState.frames.length && !timeComparisonState.inspection) {
+                        const current = timeComparisonState.registeredFrames[timeComparisonState.index];
+                        timeComparisonState.inspection = current?.wcsRegistered
+                            ? { x: (current.width - 1) / 2, y: (current.height - 1) / 2 }
+                            : current ? { x: current.centerX, y: current.centerY } : null;
+                        if (!document.getElementById('timeComparisonAnalysisPanel').classList.contains('hidden')) drawTimeComparisonFrame();
+                    }
+                    renderTimeComparisonAnalysis();
                     updateTimeComparisonControls();
                 }
             }
@@ -2582,6 +2668,8 @@
             const frames = timeComparisonState.frames;
             const metadata = document.getElementById('timeComparisonFrameMetadata');
             if (!frames.length) {
+                timeComparisonState.registeredFrames = [];
+                timeComparisonState.displayRect = null;
                 metadata.textContent = timeComparisonState.loading ? 'Loading live SPHEREx image data…' : 'No SPHEREx images loaded.';
                 context.fillStyle = '#94a3b8';
                 context.textAlign = 'center';
@@ -2600,6 +2688,7 @@
             // Register every epoch to the same sky coordinate, not the
             // moving target position. This keeps background stars fixed.
             const registeredFrames = frames.map(candidate => registerBlinkFrame(candidate, target, outputScale));
+            timeComparisonState.registeredFrames = registeredFrames;
             const frame = registeredFrames[timeComparisonState.index];
             const viewMode = document.getElementById('timeComparisonView').value;
             const referenceRawFrame = frames.find(candidate => candidate.detector === rawFrame.detector
@@ -2630,6 +2719,7 @@
             });
             if (bitmap) {
                 const size = Math.max(1, Math.min(width, height) * 0.86);
+                timeComparisonState.displayRect = { left: (width - size) / 2, top: (height - size) / 2, size, width, height };
                 // Smooth only the on-screen enlargement; keep the FITS samples
                 // untouched for measurements, exports, and epoch comparisons.
                 context.imageSmoothingEnabled = true;
@@ -2652,6 +2742,19 @@
                     context.lineTo(width / 2 + 12, height / 2);
                     context.moveTo(width / 2, height / 2 - 12);
                     context.lineTo(width / 2, height / 2 + 12);
+                    context.stroke();
+                }
+                if (timeComparisonState.inspection && !document.getElementById('timeComparisonAnalysisPanel').classList.contains('hidden')) {
+                    const pointX = (width - size) / 2 + timeComparisonState.inspection.x / frame.width * size;
+                    const pointY = (height - size) / 2 + timeComparisonState.inspection.y / frame.height * size;
+                    context.strokeStyle = '#fde047';
+                    context.lineWidth = 1.5;
+                    context.beginPath();
+                    context.arc(pointX, pointY, 6, 0, Math.PI * 2);
+                    context.moveTo(pointX - 10, pointY);
+                    context.lineTo(pointX + 10, pointY);
+                    context.moveTo(pointX, pointY - 10);
+                    context.lineTo(pointX, pointY + 10);
                     context.stroke();
                 }
                 if (frame.wcsRegistered && Number.isFinite(frameEpoch) && target?.motion) {
@@ -2677,6 +2780,456 @@
             }
             const date = Number.isFinite(rawFrame.timestamp) ? new Date(rawFrame.timestamp).toISOString() : 'Date unavailable';
             metadata.textContent = `${date} UTC · ${rawFrame.detector || 'Array unavailable'} · ${Number.isFinite(rawFrame.wavelengthUm) ? `${rawFrame.wavelengthUm.toFixed(3)} μm` : 'Band unavailable'} · ${rawFrame.observationId || 'Observation ID unavailable'}${target?.motion ? ' · Gaia DR3 predicted position marked' : ''}${rawFrame.flagsAvailable === false ? ' · FLAGS unavailable' : ''}${frame.wcsRegistered ? ' · fixed sky registration' : ' · WCS alignment unavailable'}`;
+        }
+
+        function handleTimeComparisonCanvasClick(event) {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const display = timeComparisonState.displayRect;
+            const frame = timeComparisonState.registeredFrames[timeComparisonState.index];
+            if (!display || !frame) return;
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            if (x < display.left || y < display.top || x > display.left + display.size || y > display.top + display.size) return;
+            timeComparisonState.inspection = {
+                x: Math.max(0, Math.min(frame.width - 1, (x - display.left) / display.size * frame.width)),
+                y: Math.max(0, Math.min(frame.height - 1, (y - display.top) / display.size * frame.height))
+            };
+            timeComparisonState.analysisHoverIndex = null;
+            const panel = document.getElementById('timeComparisonAnalysisPanel');
+            panel.classList.remove('hidden');
+            document.getElementById('timeComparisonAnalyzeBtn').textContent = 'Hide analysis';
+            renderTimeComparisonAnalysis();
+            drawTimeComparisonFrame();
+        }
+
+        function timeComparisonPixelSkyPosition(frame, pixelX, pixelY) {
+            const ra = frame.wcsRegistered ? timeComparisonState.target?.ra : frame.centerRa;
+            const dec = frame.wcsRegistered ? timeComparisonState.target?.dec : frame.centerDec;
+            if (!Number.isFinite(ra) || !Number.isFinite(dec)
+                || !Number.isFinite(frame.pixelScaleArcsec) || frame.pixelScaleArcsec <= 0) return null;
+            const cosine = Math.cos(dec * Math.PI / 180);
+            if (Math.abs(cosine) < 1e-6) return null;
+            const referenceX = frame.wcsRegistered ? (frame.width - 1) / 2 : frame.centerX;
+            const referenceY = frame.wcsRegistered ? (frame.height - 1) / 2 : frame.centerY;
+            const eastArcsec = (referenceX - pixelX) * frame.pixelScaleArcsec;
+            const northArcsec = (referenceY - pixelY) * frame.pixelScaleArcsec;
+            return {
+                ra: ((ra + eastArcsec / (3600 * cosine)) % 360 + 360) % 360,
+                dec: dec + northArcsec / 3600
+            };
+        }
+
+        function analyzeTimeComparisonFrame(frame, inspection, followMotion) {
+            let centerX = inspection.x;
+            let centerY = inspection.y;
+            const target = timeComparisonState.target;
+            const epochYear = Number.isFinite(frame.timestamp)
+                ? 2000 + (frame.timestamp - Date.UTC(2000, 0, 1, 12)) / (365.25 * 86400000)
+                : NaN;
+            const targetProbe = Math.hypot(
+                inspection.x - (frame.width - 1) / 2,
+                inspection.y - (frame.height - 1) / 2
+            ) <= 8;
+            if (followMotion && targetProbe && target?.motion && Number.isFinite(epochYear)) {
+                const predicted = propagateGaiaMotionToYear(target.motion, epochYear);
+                if (predicted) {
+                    const east = (((predicted.ra - target.ra + 540) % 360) - 180)
+                        * Math.cos(target.dec * Math.PI / 180) * 3600;
+                    const north = (predicted.dec - target.dec) * 3600;
+                    centerX -= east / frame.pixelScaleArcsec;
+                    centerY -= north / frame.pixelScaleArcsec;
+                }
+            }
+            const aperture = [];
+            const annulus = [];
+            const aperturePositions = [];
+            let flaggedPixels = 0;
+            for (let y = Math.max(0, Math.floor(centerY - 9)); y <= Math.min(frame.height - 1, Math.ceil(centerY + 9)); y += 1) {
+                for (let x = Math.max(0, Math.floor(centerX - 9)); x <= Math.min(frame.width - 1, Math.ceil(centerX + 9)); x += 1) {
+                    const index = y * frame.width + x;
+                    if (frame.flags?.[index] !== 0) { flaggedPixels += 1; continue; }
+                    const value = frame.pixels[index];
+                    if (!Number.isFinite(value)) continue;
+                    const radius = Math.hypot(x - centerX, y - centerY);
+                    if (radius <= 3.5) {
+                        aperture.push(value);
+                        aperturePositions.push({ x, y, value });
+                    } else if (radius >= 5 && radius <= 9) annulus.push(value);
+                }
+            }
+            const background = medianValue(annulus);
+            const excess = aperture.length >= 6 && annulus.length >= 12
+                ? medianValue(aperture) - background
+                : NaN;
+            const noise = annulus.length >= 12
+                ? 1.4826 * medianValue(annulus.map(value => Math.abs(value - background)))
+                : NaN;
+            const uncertainty = Number.isFinite(noise) && aperture.length
+                ? 1.253 * noise / Math.sqrt(aperture.length)
+                : NaN;
+            const peak = aperture.length ? Math.max(...aperture) : NaN;
+            let weight = 0, centroidX = NaN, centroidY = NaN;
+            if (Number.isFinite(background) && Number.isFinite(noise) && peak > background + 3 * noise) {
+                let sumX = 0, sumY = 0;
+                for (const point of aperturePositions) {
+                    const pointWeight = Math.max(0, point.value - background);
+                    weight += pointWeight;
+                    sumX += point.x * pointWeight;
+                    sumY += point.y * pointWeight;
+                }
+                if (weight > 0) { centroidX = sumX / weight; centroidY = sumY / weight; }
+            }
+            const centroid = Number.isFinite(centroidX) ? timeComparisonPixelSkyPosition(frame, centroidX, centroidY) : null;
+            const selectedX = Math.max(0, Math.min(frame.width - 1, Math.round(inspection.x)));
+            const selectedY = Math.max(0, Math.min(frame.height - 1, Math.round(inspection.y)));
+            const selectedIndex = selectedY * frame.width + selectedX;
+            const selectedPixel = frame.flags?.[selectedIndex] === 0 && Number.isFinite(frame.pixels[selectedIndex])
+                ? frame.pixels[selectedIndex]
+                : NaN;
+            return {
+                frame,
+                timestamp: frame.timestamp,
+                wavelengthUm: frame.wavelengthUm,
+                selectedPixel,
+                brightnessExcess: excess,
+                uncertainty,
+                snr: Number.isFinite(excess) && Number.isFinite(uncertainty) && uncertainty > 0 ? excess / uncertainty : NaN,
+                background,
+                noise,
+                flaggedPixels,
+                apertureCount: aperture.length,
+                centroid,
+                centroidX,
+                centroidY,
+                followMotion
+            };
+        }
+
+        function timeComparisonFrameDiagnostics(frame) {
+            const values = [];
+            let flagged = 0, invalid = 0;
+            for (let index = 0; index < frame.pixels.length; index += 1) {
+                if (frame.flags?.[index] !== 0) { flagged += 1; continue; }
+                if (Number.isFinite(frame.pixels[index])) values.push(frame.pixels[index]);
+                else invalid += 1;
+            }
+            values.sort((left, right) => left - right);
+            const percentile = fraction => values.length
+                ? values[Math.min(values.length - 1, Math.floor((values.length - 1) * fraction))]
+                : NaN;
+            const median = percentile(0.5);
+            const robustNoise = values.length
+                ? 1.4826 * medianValue(values.map(value => Math.abs(value - median)))
+                : NaN;
+            return {
+                valid: values.length, flagged, invalid, min: percentile(0.01), max: percentile(0.99), median, robustNoise
+            };
+        }
+
+        function timeComparisonImageChange(current, reference) {
+            if (!current || !reference || current.pixels.length !== reference.pixels.length) return null;
+            const differences = [];
+            for (let index = 0; index < current.pixels.length; index += 1) {
+                if (current.flags?.[index] !== 0 || reference.flags?.[index] !== 0) continue;
+                const difference = current.pixels[index] - reference.pixels[index];
+                if (Number.isFinite(difference)) differences.push(difference);
+            }
+            if (differences.length < 20) return { valid: differences.length, noise: NaN, positive: 0, negative: 0 };
+            const center = medianValue(differences);
+            const noise = Math.max(1.4826 * medianValue(differences.map(value => Math.abs(value - center))), 1e-12);
+            let positive = 0, negative = 0;
+            for (const difference of differences) {
+                if (difference - center >= 5 * noise) positive += 1;
+                else if (center - difference >= 5 * noise) negative += 1;
+            }
+            return { valid: differences.length, median: center, noise, positive, negative };
+        }
+
+        function renderTimeComparisonAnalysis() {
+            const panel = document.getElementById('timeComparisonAnalysisPanel');
+            if (!panel || panel.classList.contains('hidden')) return;
+            const frames = timeComparisonState.frames;
+            const registered = timeComparisonState.registeredFrames;
+            const index = timeComparisonState.index;
+            const status = document.getElementById('timeComparisonAnalysisStatus');
+            const details = document.getElementById('timeComparisonFrameDetails');
+            const body = document.getElementById('timeComparisonAnalysisRows');
+            details.replaceChildren();
+            body.replaceChildren();
+            timeComparisonState.analysisSamples = [];
+            if (!frames.length || !registered[index]) {
+                status.textContent = 'Load SPHEREx epochs to inspect image pixels.';
+                drawTimeComparisonAnalysisChart([]);
+                return;
+            }
+            const currentRaw = frames[index];
+            const current = registered[index];
+            const diagnostics = timeComparisonFrameDiagnostics(current);
+            const compatibleIndexes = frames.map((frame, frameIndex) => ({ frame, frameIndex }))
+                .filter(item => item.frame.detector === currentRaw.detector
+                    && Math.abs(item.frame.wavelengthUm - currentRaw.wavelengthUm) < 0.02);
+            const baseline = compatibleIndexes[0];
+            const followMotion = document.getElementById('timeComparisonFollowMotion').checked
+                && Boolean(timeComparisonState.target?.motion);
+            const samples = timeComparisonState.inspection
+                ? compatibleIndexes.map(({ frame, frameIndex }) => analyzeTimeComparisonFrame(registered[frameIndex], timeComparisonState.inspection, followMotion))
+                : [];
+            const baseMeasurement = samples[0];
+            const baselinePosition = samples.find(sample => sample.centroid)?.centroid;
+            for (const sample of samples) {
+                sample.brightnessDelta = Number.isFinite(sample.brightnessExcess) && Number.isFinite(baseMeasurement?.brightnessExcess)
+                    ? sample.brightnessExcess - baseMeasurement.brightnessExcess
+                    : NaN;
+                if (baselinePosition && sample.centroid) {
+                    sample.eastOffsetArcsec = ((((sample.centroid.ra - baselinePosition.ra + 540) % 360) - 180)
+                        * Math.cos(baselinePosition.dec * Math.PI / 180) * 3600);
+                    sample.northOffsetArcsec = (sample.centroid.dec - baselinePosition.dec) * 3600;
+                } else {
+                    sample.eastOffsetArcsec = NaN;
+                    sample.northOffsetArcsec = NaN;
+                }
+            }
+            timeComparisonState.analysisSamples = samples;
+            const imageDelta = baseline && baseline.frameIndex !== index
+                ? timeComparisonImageChange(current, registered[baseline.frameIndex])
+                : null;
+            const currentSourceIndex = currentRaw.observationId || 'Observation ID unavailable';
+            const currentSample = samples.find(sample => sample.frame === current);
+            const coordinate = timeComparisonState.inspection
+                ? timeComparisonPixelSkyPosition(current, timeComparisonState.inspection.x, timeComparisonState.inspection.y)
+                : null;
+            status.textContent = timeComparisonState.inspection
+                ? `Inspecting aligned pixel (${Math.round(timeComparisonState.inspection.x)}, ${Math.round(timeComparisonState.inspection.y)})${coordinate ? ` · RA ${coordinate.ra.toFixed(6)}°, Dec ${coordinate.dec.toFixed(6)}°` : ''}. Photometry uses the selected wavelength group.`
+                : 'Click the image to probe a sky coordinate. The view reports calibrated pixels, local background/noise, flags, and matching-band changes.';
+            const metrics = [
+                ['Observation', currentSourceIndex],
+                ['Image', `${current.width} × ${current.height} pixels`],
+                ['Detector / wavelength', `${current.detector} · ${current.wavelengthUm.toFixed(3)} μm`],
+                ['Pixel scale', `${current.pixelScaleArcsec.toFixed(2)}″/pixel`],
+                ['Valid / flagged', `${diagnostics.valid.toLocaleString()} / ${diagnostics.flagged.toLocaleString()}`],
+                ['Median / robust noise', `${diagnostics.median.toPrecision(4)} / ${diagnostics.robustNoise.toPrecision(3)} MJy/sr`],
+                ['1–99% display range', `${diagnostics.min.toPrecision(4)} to ${diagnostics.max.toPrecision(4)} MJy/sr`],
+                ...(currentSample ? [
+                    ['Selected pixel', Number.isFinite(currentSample.selectedPixel) ? `${currentSample.selectedPixel.toPrecision(4)} MJy/sr` : 'Flagged / unavailable'],
+                    ['Aperture brightness', Number.isFinite(currentSample.brightnessExcess) ? `${currentSample.brightnessExcess.toPrecision(4)} ± ${currentSample.uncertainty.toPrecision(3)} MJy/sr` : 'Insufficient clean pixels'],
+                    ['Aperture S/N', Number.isFinite(currentSample.snr) ? currentSample.snr.toFixed(2) : 'Unavailable'],
+                    ['Local background', Number.isFinite(currentSample.background) ? `${currentSample.background.toPrecision(4)} MJy/sr · σ ${currentSample.noise.toPrecision(3)}` : 'Unavailable'],
+                    ['Centroid', currentSample.centroid ? `RA ${currentSample.centroid.ra.toFixed(5)}°, Dec ${currentSample.centroid.dec.toFixed(5)}°` : 'No reliable detection']
+                ] : []),
+                ['Change pixels vs baseline', imageDelta
+                    ? `+${imageDelta.positive.toLocaleString()} / −${imageDelta.negative.toLocaleString()} pixels at ≥5 robust σ${imageDelta.valid ? ` · ${((imageDelta.positive + imageDelta.negative) / imageDelta.valid * 100).toFixed(2)}%` : ''}`
+                    : 'Baseline epoch']
+            ];
+            for (const [label, value] of metrics) {
+                const item = document.createElement('div');
+                item.className = 'rounded bg-slate-900 px-2 py-1';
+                const title = document.createElement('span');
+                title.className = 'block text-[8px] uppercase text-slate-500';
+                title.textContent = label;
+                const text = document.createElement('span');
+                text.className = 'block break-words font-mono text-[9px] text-slate-200';
+                text.textContent = value;
+                item.append(title, text);
+                details.appendChild(item);
+            }
+            if (!samples.length) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 9;
+                cell.className = 'p-2 text-slate-500';
+                cell.textContent = 'Click a point in the image to measure its calibrated value and local aperture brightness over time.';
+                row.appendChild(cell);
+                body.appendChild(row);
+                drawTimeComparisonAnalysisChart([]);
+                return;
+            }
+            for (const sample of samples) {
+                const row = document.createElement('tr');
+                row.className = `cursor-pointer border-t border-slate-800 hover:bg-slate-900${sample.frame === current ? ' bg-cyan-950/40' : ''}`;
+                row.dataset.epochIndex = String(registered.indexOf(sample.frame));
+                row.title = 'Click to view this observation';
+                const offset = Number.isFinite(sample.eastOffsetArcsec) && Number.isFinite(sample.northOffsetArcsec)
+                    ? `${sample.eastOffsetArcsec.toFixed(2)}″ / ${sample.northOffsetArcsec.toFixed(2)}″`
+                    : 'No reliable centroid';
+                const cells = [
+                    Number.isFinite(sample.timestamp) ? new Date(sample.timestamp).toISOString().slice(0, 19).replace('T', ' ') : '—',
+                    Number.isFinite(sample.wavelengthUm) ? sample.wavelengthUm.toFixed(3) : '—',
+                    Number.isFinite(sample.selectedPixel) ? sample.selectedPixel.toPrecision(4) : 'flagged / unavailable',
+                    Number.isFinite(sample.brightnessExcess) ? sample.brightnessExcess.toPrecision(4) : 'insufficient clean pixels',
+                    Number.isFinite(sample.uncertainty) ? `±${sample.uncertainty.toPrecision(3)}` : '—',
+                    Number.isFinite(sample.snr) ? sample.snr.toFixed(2) : '—',
+                    Number.isFinite(sample.brightnessDelta) ? `${sample.brightnessDelta >= 0 ? '+' : ''}${sample.brightnessDelta.toPrecision(3)}` : '—',
+                    offset,
+                    String(sample.flaggedPixels)
+                ];
+                for (const value of cells) {
+                    const cell = document.createElement('td');
+                    cell.className = 'p-1 font-mono';
+                    cell.textContent = value;
+                    row.appendChild(cell);
+                }
+                body.appendChild(row);
+            }
+            drawTimeComparisonAnalysisChart(samples);
+        }
+
+        function drawTimeComparisonAnalysisChart(samples) {
+            const canvas = document.getElementById('timeComparisonAnalysisChart');
+            const note = document.getElementById('timeComparisonAnalysisPlotNote');
+            const tooltip = document.getElementById('timeComparisonAnalysisTooltip');
+            const metric = document.getElementById('timeComparisonAnalysisMetric').value;
+            const ratio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+            const width = Math.max(280, Math.floor(canvas.clientWidth || 600));
+            const height = Math.max(150, Math.floor(canvas.clientHeight || 176));
+            if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+                canvas.width = Math.round(width * ratio);
+                canvas.height = Math.round(height * ratio);
+            }
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, width, height);
+            const metricInfo = {
+                brightnessExcess: { label: 'Local aperture brightness', unit: 'MJy/sr', field: 'brightnessExcess' },
+                brightnessDelta: { label: 'Brightness change from first epoch', unit: 'MJy/sr', field: 'brightnessDelta' },
+                eastOffsetArcsec: { label: 'Centroid motion east from first detection', unit: 'arcsec', field: 'eastOffsetArcsec' },
+                northOffsetArcsec: { label: 'Centroid motion north from first detection', unit: 'arcsec', field: 'northOffsetArcsec' },
+                snr: { label: 'Aperture signal-to-noise ratio', unit: 'σ', field: 'snr' }
+            }[metric] || { label: 'Local aperture brightness', unit: 'MJy/sr', field: 'brightnessExcess' };
+            const points = samples.map((sample, index) => ({ sample, index, value: sample[metricInfo.field] }))
+                .filter(point => Number.isFinite(point.value));
+            timeComparisonState.analysisPlotPoints = [];
+            if (!points.length) {
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '11px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                const message = timeComparisonState.inspection
+                    ? 'No usable measurements for this plot. Check flags, aperture coverage, and centroid signal.'
+                    : 'Click a source in the image to plot its measurements over time.';
+                ctx.fillText(message, width / 2, height / 2);
+                note.textContent = timeComparisonState.inspection
+                    ? 'Measurements need enough unflagged pixels; centroid plots also need a reliable source detection.'
+                    : 'Choose a source position in the image. Click a plotted epoch to jump to its image.';
+                tooltip.classList.add('hidden');
+                return;
+            }
+            const left = 54, right = width - 12, top = 14, bottom = height - 34;
+            const values = points.map(point => point.value);
+            if (metric === 'brightnessExcess') {
+                for (const point of points) {
+                    if (Number.isFinite(point.sample.uncertainty)) {
+                        values.push(point.value - point.sample.uncertainty, point.value + point.sample.uncertainty);
+                    }
+                }
+            }
+            let min = Math.min(...values), max = Math.max(...values);
+            const span = max - min;
+            const padding = span > 0 ? span * 0.12 : Math.max(Math.abs(max) * 0.12, 0.1);
+            min -= padding; max += padding;
+            const times = points.map(point => point.sample.timestamp).filter(Number.isFinite);
+            const t0 = times.length ? Math.min(...times) : 0;
+            const t1 = times.length ? Math.max(...times) : 0;
+            const xFor = point => t1 > t0 && Number.isFinite(point.sample.timestamp)
+                ? left + (point.sample.timestamp - t0) / (t1 - t0) * (right - left)
+                : left + point.index / Math.max(1, samples.length - 1) * (right - left);
+            const yFor = value => bottom - (value - min) / (max - min) * (bottom - top);
+            ctx.font = '9px Inter, sans-serif';
+            ctx.textAlign = 'right';
+            for (let tick = 0; tick <= 4; tick += 1) {
+                const y = top + (bottom - top) * tick / 4;
+                const value = max - (max - min) * tick / 4;
+                ctx.strokeStyle = '#1e293b';
+                ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText(value.toPrecision(3), left - 5, y + 3);
+            }
+            if (min < 0 && max > 0 && metric !== 'brightnessExcess' && metric !== 'snr') {
+                const zeroY = yFor(0);
+                ctx.strokeStyle = '#475569'; ctx.setLineDash([3, 3]);
+                ctx.beginPath(); ctx.moveTo(left, zeroY); ctx.lineTo(right, zeroY); ctx.stroke(); ctx.setLineDash([]);
+            }
+            const dateAt = fraction => new Date(t0 + (t1 - t0) * fraction).toISOString().slice(0, 10);
+            ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'left';
+            if (times.length) ctx.fillText(dateAt(0), left, height - 9);
+            ctx.textAlign = 'right';
+            if (times.length && t1 > t0) ctx.fillText(dateAt(1), right, height - 9);
+            ctx.save();
+            ctx.translate(10, (top + bottom) / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center'; ctx.fillStyle = '#cbd5e1';
+            ctx.fillText(`${metricInfo.label} (${metricInfo.unit})`, 0, 0);
+            ctx.restore();
+            const selectedTimePoint = points.find(point => point.sample.frame === timeComparisonState.registeredFrames[timeComparisonState.index]);
+            if (selectedTimePoint) {
+                const selectedX = xFor(selectedTimePoint);
+                ctx.strokeStyle = 'rgba(251,191,36,.45)'; ctx.setLineDash([2, 3]);
+                ctx.beginPath(); ctx.moveTo(selectedX, top); ctx.lineTo(selectedX, bottom); ctx.stroke(); ctx.setLineDash([]);
+            }
+            ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 1.75;
+            ctx.beginPath();
+            points.forEach((point, index) => {
+                const x = xFor(point), y = yFor(point.value);
+                if (!index) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            for (const point of points) {
+                const x = xFor(point), y = yFor(point.value);
+                if (metric === 'brightnessExcess' && Number.isFinite(point.sample.uncertainty)) {
+                    const y1 = yFor(point.value - point.sample.uncertainty);
+                    const y2 = yFor(point.value + point.sample.uncertainty);
+                    ctx.strokeStyle = '#67e8f9'; ctx.lineWidth = 1;
+                    ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y2); ctx.moveTo(x - 3, y1); ctx.lineTo(x + 3, y1); ctx.moveTo(x - 3, y2); ctx.lineTo(x + 3, y2); ctx.stroke();
+                }
+                ctx.beginPath();
+                ctx.fillStyle = point.index === timeComparisonState.analysisHoverIndex ? '#f8fafc' : '#fbbf24';
+                ctx.arc(x, y, point.index === timeComparisonState.analysisHoverIndex ? 4 : 2.8, 0, Math.PI * 2);
+                ctx.fill();
+                timeComparisonState.analysisPlotPoints.push({ ...point, x, y, label: metricInfo.label, unit: metricInfo.unit });
+            }
+            note.textContent = `${points.length} of ${samples.length} epochs plotted · ${metricInfo.label} (${metricInfo.unit}) · Click a point to open that epoch.`;
+        }
+
+        function findTimeComparisonPlotPoint(event) {
+            const canvas = event.currentTarget;
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            let nearest = null;
+            let distance = Infinity;
+            for (const point of timeComparisonState.analysisPlotPoints) {
+                const nextDistance = Math.hypot(point.x - x, point.y - y);
+                if (nextDistance < distance) { nearest = point; distance = nextDistance; }
+            }
+            return distance <= 14 ? nearest : null;
+        }
+
+        function handleTimeComparisonAnalysisPointerMove(event) {
+            const point = findTimeComparisonPlotPoint(event);
+            const tooltip = document.getElementById('timeComparisonAnalysisTooltip');
+            if (!point) {
+                tooltip.classList.add('hidden');
+                if (timeComparisonState.analysisHoverIndex !== null) {
+                    timeComparisonState.analysisHoverIndex = null;
+                    drawTimeComparisonAnalysisChart(timeComparisonState.analysisSamples);
+                }
+                return;
+            }
+            timeComparisonState.analysisHoverIndex = point.index;
+            drawTimeComparisonAnalysisChart(timeComparisonState.analysisSamples);
+            const timestamp = Number.isFinite(point.sample.timestamp) ? new Date(point.sample.timestamp).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'Date unavailable';
+            const obs = point.sample.frame?.observationId || 'Observation ID unavailable';
+            tooltip.textContent = `${timestamp} · ${point.label}: ${point.value.toPrecision(4)} ${point.unit} · ${obs}`;
+            const host = tooltip.parentElement.getBoundingClientRect();
+            tooltip.style.left = `${Math.max(4, Math.min(host.width - 250, event.clientX - host.left + 8))}px`;
+            tooltip.style.top = `${Math.max(2, Math.min(host.height - 34, event.clientY - host.top - 28))}px`;
+            tooltip.classList.remove('hidden');
+        }
+
+        function handleTimeComparisonAnalysisChartClick(event) {
+            const point = findTimeComparisonPlotPoint(event);
+            if (!point) return;
+            const index = timeComparisonState.registeredFrames.indexOf(point.sample.frame);
+            if (index >= 0) setTimeComparisonFrame(index);
         }
 
         function getTimeComparisonBrightnessRange(frame, frames) {
@@ -2737,12 +3290,14 @@
             document.getElementById('timeComparisonPlayBtn').disabled = frames.length < 2;
             document.getElementById('timeComparisonEpochLabel').textContent = hasFrames ? `${index + 1} / ${frames.length}` : 'No epochs';
             document.getElementById('timeComparisonPlayBtn').textContent = timeComparisonState.timer ? '❚❚ Pause' : '▶ Play';
+            document.getElementById('timeComparisonAnalyzeBtn').disabled = !hasFrames;
         }
 
         function setTimeComparisonFrame(index) {
             if (!timeComparisonState.frames.length) return;
             timeComparisonState.index = Math.max(0, Math.min(timeComparisonState.frames.length - 1, index));
             drawTimeComparisonFrame();
+            renderTimeComparisonAnalysis();
             updateTimeComparisonControls();
         }
 
@@ -2761,6 +3316,7 @@
                     }
                     timeComparisonState.index += 1;
                     drawTimeComparisonFrame();
+                    renderTimeComparisonAnalysis();
                     updateTimeComparisonControls();
                 }, Number(document.getElementById('timeComparisonSpeed').value));
             }

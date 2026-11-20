@@ -1,0 +1,16 @@
+Prompt:
+ok so over here, in example.html, i put a backup version or the layut of the index.html, but the urrent index.html ahs new featuers but the issue is that ht elyout kinda got ruined so torubleshoot why and also add all the featuers you see in in checklist.md without breaking aynthign else and fi xthe current bug please! dont touch spherex project backups those are backups and akso yes! everything is here for you
+
+Error:
+(index):64 cdn.tailwindcss.com should not be used in production. To use Tailwind CSS in production, install it as a PostCSS plugin or use the Tailwind CLI: https://tailwindcss.com/docs/installation
+(anonymous) @ (index):64
+index.html:2820 Uncaught SyntaxError: Identifier 'starCanvas' has already been declared
+aladin.js:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+index.html:1 Electron Security Warning (Insecure Content-Security-Policy) This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
